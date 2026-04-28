@@ -34,6 +34,25 @@
         #time-display { color: #5a7a5a; }
         #combo-display { color: #ff8c00; display: none; }
 
+        /* Pause button */
+        #pause-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.7);
+            border: 2px solid rgba(139,105,20,0.3);
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 100;
+            display: none;
+            font-size: 20px;
+            color: #8b6914;
+            transition: transform 0.1s;
+        }
+        #pause-btn:hover { transform: scale(1.1); }
+
         /* Combo bar */
         #combo-bar-container {
             position: fixed;
@@ -78,6 +97,7 @@
         .powerup-double { background: #ffd700; color: #8b6914; }
         .powerup-freeze { background: #4ecdc4; color: #fff; }
 
+        /* Screens */
         #start-screen, #game-over-screen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -106,8 +126,56 @@
         }
         .btn:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(139,105,20,0.6); }
         .btn:active { transform: scale(0.98); }
-        #final-score { color: #8b6914; font-size: 64px; margin: 20px 0; }
+        .btn-small {
+            padding: 12px 30px;
+            font-size: 18px;
+            margin: 5px;
+        }
+        #final-score { color: #8b6914; font-size: 64px; margin: 10px 0; }
         .instructions { color: #888; font-size: 16px; margin-top: 30px; max-width: 400px; text-align: center; line-height: 1.6; }
+
+        /* Stats display */
+        #stats-display {
+            display: flex;
+            gap: 30px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 10px 20px;
+            background: rgba(139,105,20,0.1);
+            border-radius: 15px;
+        }
+        .stat-value { font-size: 32px; font-weight: bold; color: #8b6914; }
+        .stat-label { font-size: 14px; color: #888; margin-top: 5px; }
+        #high-score-badge {
+            background: linear-gradient(180deg, #ffd700, #ff8c00);
+            color: #8b6914;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        /* Pause overlay */
+        #pause-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 250;
+        }
+        #pause-overlay h2 { color: #ffd700; font-size: 64px; }
+        #pause-overlay .btn { margin: 10px; }
+
+        /* Crosshair */
         #crosshair {
             position: fixed;
             width: 48px; height: 48px;
@@ -150,8 +218,6 @@
         }
         #praise-popup.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
         #praise-popup.hide { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
-
-        /* Combo break effect */
         #combo-break {
             position: fixed;
             top: 40%;
@@ -168,8 +234,6 @@
         }
         #combo-break.show { opacity: 1; }
         #combo-break.hide { opacity: 0; }
-
-        /* Score popup */
         .score-popup {
             position: fixed;
             font-size: 24px;
@@ -188,12 +252,19 @@
     <div id="crosshair"></div>
     <div id="praise-popup"></div>
     <div id="combo-break">连击中断！</div>
+    <div id="pause-overlay">
+        <h2>游戏暂停</h2>
+        <button class="btn" id="resume-btn">继续游戏</button>
+        <button class="btn btn-small" id="quit-btn">返回主页</button>
+    </div>
     
     <div id="info">
         <span>得分: <b id="score-display">0</b></span>
         <span>时间: <b id="time-display">30</b>s</span>
         <span id="combo-display">连击: <b id="combo-count">0</b></span>
     </div>
+
+    <button id="pause-btn">⏸</button>
 
     <div id="powerup-indicator">
         <span class="powerup-badge powerup-double" id="badge-double">2倍得分</span>
@@ -207,6 +278,7 @@
     <div id="start-screen">
         <h1>3D 打地鼠</h1>
         <p class="subtitle">考验你的反应速度！</p>
+        <div id="high-score-badge">最高分: <span id="high-score-val">0</span></div>
         <button class="btn" id="start-btn">开始游戏</button>
         <p class="instructions">普通地鼠 +10分 | 金色地鼠 +50分 | 炸弹 -20分<br>快速连击获得分数加成！</p>
     </div>
@@ -214,7 +286,27 @@
     <div id="game-over-screen">
         <h2>时间到！</h2>
         <div id="final-score">0</div>
+        <div id="stats-display">
+            <div class="stat-item">
+                <div class="stat-value" id="stat-accuracy">0%</div>
+                <div class="stat-label">命中率</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-combo">0</div>
+                <div class="stat-label">最高连击</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-hits">0</div>
+                <div class="stat-label">击中次数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-time">0s</div>
+                <div class="stat-label">有效游戏时间</div>
+            </div>
+        </div>
+        <div id="high-score-badge-end" style="display:none; background: linear-gradient(180deg, #ffd700, #ff8c00); color: #8b6914; padding: 8px 20px; border-radius: 20px; font-size: 18px; font-weight: bold; margin-bottom: 10px;">新纪录！</div>
         <button class="btn" id="restart-btn">再来一局</button>
+        <button class="btn btn-small" id="home-btn">返回主页</button>
     </div>
 
     <script type="importmap">
@@ -285,8 +377,7 @@
         function playPowerupSound() {
             try {
                 const ctx = getAudioCtx();
-                const notes = [400, 500, 600, 800];
-                notes.forEach((freq, i) => {
+                [400, 500, 600, 800].forEach((freq, i) => {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     osc.connect(gain); gain.connect(ctx.destination);
@@ -312,6 +403,20 @@
                 gain.gain.setValueAtTime(0.3, ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
                 osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3);
+            } catch(e) {}
+        }
+
+        function playPauseSound() {
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = 440;
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.2);
             } catch(e) {}
         }
 
@@ -344,18 +449,35 @@
             setTimeout(() => { popup.classList.remove('show'); popup.classList.add('hide'); }, 800);
         }
 
+        // ============ HIGH SCORE (localStorage) ============
+        function getHighScore() {
+            return parseInt(localStorage.getItem('whackHighScore') || '0');
+        }
+        function setHighScore(s) {
+            localStorage.setItem('whackHighScore', s.toString());
+        }
+
         // ============ GAME STATE ============
         let score = 0;
         let timeLeft = 30;
         let gameRunning = false;
+        let gamePaused = false;
         let gameTimer = null;
         let moles = [];
         let lastMilestone = 0;
 
-        // Combo system
+        // Stats
+        let totalClicks = 0;
+        let totalHits = 0;
+        let bestCombo = 0;
+        let gameStartTime = 0;
+        let pausedTime = 0;
+        let totalPausedTime = 0;
+
+        // Combo
         let combo = 0;
         let comboTimer = 0;
-        const comboTimeout = 60; // frames (about 1 second)
+        const comboTimeout = 60;
         let lastHitTime = 0;
 
         // Power-ups
@@ -364,10 +486,50 @@
         let doubleScoreTimer = null;
         let freezeTimer = null;
 
+        // ============ PARTICLE SYSTEM ============
+        const particles = [];
+        const particleGroup = new THREE.Group();
+        scene.add(particleGroup);
+
+        function createParticle(x, y, z, color) {
+            const size = 0.05 + Math.random() * 0.1;
+            const geo = new THREE.SphereGeometry(size, 6, 6);
+            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.set(x, y, z);
+            const vx = (Math.random() - 0.5) * 0.2;
+            const vy = Math.random() * 0.15 + 0.1;
+            const vz = (Math.random() - 0.5) * 0.2;
+            particleGroup.add(p);
+            particles.push({ mesh: p, vx, vy, vz, life: 1 });
+        }
+
+        function spawnHitParticles(x, y, z, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                createParticle(x, y, z, color);
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.mesh.position.x += p.vx;
+                p.mesh.position.y += p.vy;
+                p.mesh.position.z += p.vz;
+                p.vy -= 0.01; // gravity
+                p.life -= 0.03;
+                p.mesh.material.opacity = p.life;
+                if (p.life <= 0) {
+                    particleGroup.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
         // ============ THREE.JS SETUP ============
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xf0e6d2);
-        scene.fog = new THREE.Fog(0xf0e6d2, 15, 35);
+        const scene3 = new THREE.Scene();
+        scene3.background = new THREE.Color(0xf0e6d2);
+        scene3.fog = new THREE.Fog(0xf0e6d2, 15, 35);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 8, 10);
@@ -381,7 +543,7 @@
         document.body.appendChild(renderer.domElement);
 
         const ambientLight = new THREE.AmbientLight(0xfff5e0, 0.6);
-        scene.add(ambientLight);
+        scene3.add(ambientLight);
 
         const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.0);
         dirLight.position.set(5, 12, 8);
@@ -394,19 +556,21 @@
         dirLight.shadow.camera.right = 15;
         dirLight.shadow.camera.top = 15;
         dirLight.shadow.camera.bottom = -15;
-        scene.add(dirLight);
+        scene3.add(dirLight);
 
         const fillLight = new THREE.DirectionalLight(0xffe0b0, 0.4);
         fillLight.position.set(-5, 5, -5);
-        scene.add(fillLight);
+        scene3.add(fillLight);
 
+        // Ground
         const groundGeo = new THREE.CircleGeometry(12, 64);
         const groundMat = new THREE.MeshStandardMaterial({ color: 0xd4c4a8, roughness: 0.9, metalness: 0.0 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
-        scene.add(ground);
+        scene3.add(ground);
 
+        // Grass patches
         for (let i = 0; i < 200; i++) {
             const patchGeo = new THREE.CircleGeometry(Math.random() * 0.1 + 0.05, 6);
             const patchMat = new THREE.MeshStandardMaterial({ 
@@ -417,12 +581,61 @@
             const radius = Math.random() * 10 + 2;
             patch.position.set(Math.cos(angle) * radius, 0.01, Math.sin(angle) * radius);
             patch.rotation.x = -Math.PI / 2;
-            scene.add(patch);
+            scene3.add(patch);
         }
 
+        // Decorative trees (simple low-poly)
+        function createTree(x, z) {
+            const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 6);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.set(x, 0.75, z);
+            trunk.castShadow = true;
+            scene3.add(trunk);
+
+            const leavesGeo = new THREE.SphereGeometry(0.8, 8, 8);
+            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x5a8a4a, roughness: 0.8 });
+            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            leaves.position.set(x, 2, z);
+            leaves.castShadow = true;
+            scene3.add(leaves);
+        }
+
+        // Place trees around the edge
+        const treePositions = [
+            [-8, -8], [-8, 0], [-8, 8], [8, -8], [8, 0], [8, 8],
+            [-6, -10], [0, -10], [6, -10], [-6, 10], [0, 10], [6, 10],
+            [-10, -6], [-10, 6], [10, -6], [10, 6]
+        ];
+        treePositions.forEach(([x, z]) => createTree(x, z));
+
+        // Decorative flowers
+        function createFlower(x, z, color) {
+            const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4);
+            const stemMat = new THREE.MeshStandardMaterial({ color: 0x4a7a3a });
+            const stem = new THREE.Mesh(stemGeo, stemMat);
+            stem.position.set(x, 0.15, z);
+            scene3.add(stem);
+
+            const petalGeo = new THREE.SphereGeometry(0.08, 6, 6);
+            const petalMat = new THREE.MeshStandardMaterial({ color });
+            const petal = new THREE.Mesh(petalGeo, petalMat);
+            petal.position.set(x, 0.35, z);
+            scene3.add(petal);
+        }
+
+        const flowerColors = [0xff6b6b, 0xffd700, 0xff69b4, 0x9b59b6, 0xff8c00];
+        for (let i = 0; i < 40; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 3 + Math.random() * 7;
+            const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+            createFlower(Math.cos(angle) * radius, Math.sin(angle) * radius, color);
+        }
+
+        // Holes
         const holes = [];
         const holeGroup = new THREE.Group();
-        scene.add(holeGroup);
+        scene3.add(holeGroup);
 
         for (let row = 0; row < 3; row++) {
             for (let col = 0; col < 3; col++) {
@@ -449,57 +662,60 @@
             }
         }
 
-        // Mole types: 'normal', 'golden', 'bomb'
-        // Power-up types: 'double', 'freeze'
-
+        // ============ MOLE CREATION ============
         function createMole(type = 'normal') {
             const moleGroup = new THREE.Group();
             moleGroup.userData.moleType = type;
+            moleGroup.userData.isMole = true;
 
-            let bodyColor, headColor;
-            if (type === 'golden') {
-                bodyColor = 0xffd700; headColor = 0xffd700;
-            } else if (type === 'bomb') {
-                bodyColor = 0x333333; headColor = 0x333333;
-            } else {
-                bodyColor = 0x8B6914; headColor = 0x8B6914;
-            }
+            let bodyColor;
+            if (type === 'golden') bodyColor = 0xffd700;
+            else if (type === 'bomb') bodyColor = 0x333333;
+            else bodyColor = 0x8B6914;
 
-            const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.7, metalness: type === 'golden' ? 0.5 : 0 });
+            const bodyMat = new THREE.MeshStandardMaterial({ 
+                color: bodyColor, 
+                roughness: 0.7, 
+                metalness: type === 'golden' ? 0.5 : 0 
+            });
             const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.scale.set(1, 0.8, 1);
             body.position.y = 0.4;
             body.castShadow = true;
+            body.name = 'body';
             moleGroup.add(body);
 
             const headGeo = new THREE.SphereGeometry(0.45, 32, 32);
             const head = new THREE.Mesh(headGeo, bodyMat);
             head.position.y = 0.9;
             head.castShadow = true;
+            head.name = 'head';
             moleGroup.add(head);
 
             if (type === 'bomb') {
-                // Bomb fuse
                 const fuseGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8);
                 const fuseMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
                 const fuse = new THREE.Mesh(fuseGeo, fuseMat);
                 fuse.position.set(0, 1.35, 0);
                 moleGroup.add(fuse);
-                // Spark
+
                 const sparkGeo = new THREE.SphereGeometry(0.06, 8, 8);
                 const sparkMat = new THREE.MeshBasicMaterial({ color: 0xff4500 });
                 const spark = new THREE.Mesh(sparkGeo, sparkMat);
                 spark.position.set(0, 1.5, 0);
+                spark.name = 'spark';
                 moleGroup.add(spark);
-                // Skull face
+
                 const eyeGeo = new THREE.SphereGeometry(0.1, 16, 16);
                 const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
                 const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
                 leftEye.position.set(-0.15, 1.0, 0.35);
+                leftEye.name = 'leftEye';
                 moleGroup.add(leftEye);
                 const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
                 rightEye.position.set(0.15, 1.0, 0.35);
+                rightEye.name = 'rightEye';
                 moleGroup.add(rightEye);
             } else {
                 const snoutGeo = new THREE.SphereGeometry(0.15, 16, 16);
@@ -507,103 +723,156 @@
                 const snout = new THREE.Mesh(snoutGeo, snoutMat);
                 snout.position.set(0, 0.85, 0.38);
                 snout.scale.set(1, 0.7, 1);
+                snout.name = 'snout';
                 moleGroup.add(snout);
 
                 const noseGeo = new THREE.SphereGeometry(0.06, 16, 16);
                 const noseMat = new THREE.MeshStandardMaterial({ color: type === 'golden' ? 0xff6600 : 0xff6699, roughness: 0.5 });
                 const nose = new THREE.Mesh(noseGeo, noseMat);
                 nose.position.set(0, 0.88, 0.52);
+                nose.name = 'nose';
                 moleGroup.add(nose);
 
+                // Eyes - store references for expression change
                 const eyeGeo = new THREE.SphereGeometry(0.08, 16, 16);
                 const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
                 const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
                 leftEye.position.set(-0.15, 1.0, 0.35);
+                leftEye.name = 'leftEye';
                 moleGroup.add(leftEye);
                 const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
                 rightEye.position.set(0.15, 1.0, 0.35);
+                rightEye.name = 'rightEye';
                 moleGroup.add(rightEye);
 
+                // Eye highlights
                 const highlightGeo = new THREE.SphereGeometry(0.03, 8, 8);
                 const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
                 const leftHighlight = new THREE.Mesh(highlightGeo, highlightMat);
                 leftHighlight.position.set(-0.13, 1.03, 0.41);
+                leftHighlight.name = 'leftHighlight';
                 moleGroup.add(leftHighlight);
                 const rightHighlight = new THREE.Mesh(highlightGeo, highlightMat);
                 rightHighlight.position.set(0.17, 1.03, 0.41);
+                rightHighlight.name = 'rightHighlight';
                 moleGroup.add(rightHighlight);
 
+                // Ears
                 const earGeo = new THREE.SphereGeometry(0.12, 16, 16);
                 const leftEar = new THREE.Mesh(earGeo, bodyMat);
                 leftEar.position.set(-0.35, 1.2, 0);
                 leftEar.castShadow = true;
+                leftEar.name = 'leftEar';
                 moleGroup.add(leftEar);
                 const rightEar = new THREE.Mesh(earGeo, bodyMat);
                 rightEar.position.set(0.35, 1.2, 0);
                 rightEar.castShadow = true;
+                rightEar.name = 'rightEar';
                 moleGroup.add(rightEar);
 
+                // Cheeks
                 const cheekGeo = new THREE.SphereGeometry(0.1, 16, 16);
                 const cheekMat = new THREE.MeshStandardMaterial({ color: type === 'golden' ? 0xffffaa : 0xffaaaa, transparent: true, opacity: 0.5 });
                 const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
                 leftCheek.position.set(-0.28, 0.9, 0.3);
                 leftCheek.scale.set(1, 0.6, 0.3);
+                leftCheek.name = 'leftCheek';
                 moleGroup.add(leftCheek);
                 const rightCheek = new THREE.Mesh(cheekGeo, cheekMat);
                 rightCheek.position.set(0.28, 0.9, 0.3);
                 rightCheek.scale.set(1, 0.6, 0.3);
+                rightCheek.name = 'rightCheek';
                 moleGroup.add(rightCheek);
 
+                // Teeth
                 const toothGeo = new THREE.BoxGeometry(0.08, 0.1, 0.05);
                 const toothMat = new THREE.MeshStandardMaterial({ color: 0xfffff0 });
                 const leftTooth = new THREE.Mesh(toothGeo, toothMat);
                 leftTooth.position.set(-0.06, 0.72, 0.4);
+                leftTooth.name = 'leftTooth';
                 moleGroup.add(leftTooth);
                 const rightTooth = new THREE.Mesh(toothGeo, toothMat);
                 rightTooth.position.set(0.06, 0.72, 0.4);
+                rightTooth.name = 'rightTooth';
                 moleGroup.add(rightTooth);
             }
 
-            moleGroup.userData = { isMole: true, baseY: 0, hit: false, moleType: type };
             return moleGroup;
         }
 
-        // Create power-up mesh
+        // Change mole expression to "dizzy/hit" face
+        function setMoleHitExpression(moleGroup, type) {
+            if (type === 'bomb') return; // bomb doesn't change expression
+
+            const head = moleGroup.getObjectByName('head');
+            if (head) {
+                // Slightly flatten head to show daze
+                head.scale.set(1.1, 0.75, 1.1);
+            }
+
+            // Replace eyes with X eyes
+            const leftEye = moleGroup.getObjectByName('leftEye');
+            const rightEye = moleGroup.getObjectByName('rightEye');
+            const leftHighlight = moleGroup.getObjectByName('leftHighlight');
+            const rightHighlight = moleGroup.getObjectByName('rightHighlight');
+
+            if (leftEye) {
+                leftEye.geometry = new THREE.SphereGeometry(0.1, 4, 4);
+                leftEye.material.color.setHex(0x111111);
+            }
+            if (rightEye) {
+                rightEye.geometry = new THREE.SphereGeometry(0.1, 4, 4);
+                rightEye.material.color.setHex(0x111111);
+            }
+            if (leftHighlight) leftHighlight.visible = false;
+            if (rightHighlight) rightHighlight.visible = false;
+
+            // Remove teeth (open mouth)
+            const leftTooth = moleGroup.getObjectByName('leftTooth');
+            const rightTooth = moleGroup.getObjectByName('rightTooth');
+            if (leftTooth) leftTooth.visible = false;
+            if (rightTooth) rightTooth.visible = false;
+
+            // Remove cheeks
+            const leftCheek = moleGroup.getObjectByName('leftCheek');
+            const rightCheek = moleGroup.getObjectByName('rightCheek');
+            if (leftCheek) leftCheek.visible = false;
+            if (rightCheek) rightCheek.visible = false;
+        }
+
+        // ============ POWER-UP MESH ============
         function createPowerupMesh(type) {
             const group = new THREE.Group();
             group.userData.powerupType = type;
+            group.userData.isPowerup = true;
 
             if (type === 'double') {
-                // Gold star
                 const starGeo = new THREE.OctahedronGeometry(0.4, 0);
                 const starMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.5, roughness: 0.3, emissive: 0xffd700, emissiveIntensity: 0.3 });
                 const star = new THREE.Mesh(starGeo, starMat);
                 star.rotation.z = Math.PI / 4;
                 group.add(star);
             } else if (type === 'freeze') {
-                // Blue snowflake-like
                 const flakeGeo = new THREE.OctahedronGeometry(0.4, 0);
                 const flakeMat = new THREE.MeshStandardMaterial({ color: 0x4ecdc4, metalness: 0.3, roughness: 0.3, emissive: 0x4ecdc4, emissiveIntensity: 0.3 });
                 const flake = new THREE.Mesh(flakeGeo, flakeMat);
                 group.add(flake);
             }
-
-            group.userData = { isPowerup: true, powerupType: type, hit: false };
             return group;
         }
 
-        // Spawn mole with type
+        // ============ SPAWNING ============
         function showMole(holeIndex, type = 'normal') {
             if (holes[holeIndex].occupied) return;
             
             const mole = createMole(type);
             mole.position.set(holes[holeIndex].x, -1, holes[holeIndex].z);
             mole.userData.holeIndex = holeIndex;
-            scene.add(mole);
+            scene3.add(mole);
             
             holes[holeIndex].occupied = true;
             holes[holeIndex].mole = mole;
-            moles.push({ mesh: mole, holeIndex, state: 'rising', timer: 0, hit: false, moleType: type });
+            moles.push({ mesh: mole, holeIndex, state: 'rising', timer: 0, hit: false, moleType: type, isPowerup: false });
 
             const targetY = 0.6;
             const duration = 400;
@@ -621,14 +890,13 @@
             animateRise();
         }
 
-        // Spawn power-up
         function showPowerup(holeIndex, type) {
             if (holes[holeIndex].occupied) return;
             
             const powerup = createPowerupMesh(type);
             powerup.position.set(holes[holeIndex].x, -1, holes[holeIndex].z);
             powerup.userData.holeIndex = holeIndex;
-            scene.add(powerup);
+            scene3.add(powerup);
             
             holes[holeIndex].occupied = true;
             holes[holeIndex].mole = powerup;
@@ -645,7 +913,6 @@
                 const progress = Math.min(elapsed / duration, 1);
                 const eased = 1 - Math.pow(1 - progress, 3) * Math.cos(progress * Math.PI * 0.5);
                 powerup.position.y = startY + (targetY - startY) * eased;
-                // Rotate power-up
                 powerup.rotation.y += 0.05;
                 if (progress < 1) requestAnimationFrame(animateRise);
             }
@@ -671,14 +938,14 @@
                 if (progress < 1) {
                     requestAnimationFrame(animateHide);
                 } else {
-                    scene.remove(mole);
+                    scene3.remove(mole);
                     moles = moles.filter(m => m !== moleData);
                 }
             }
             animateHide();
         }
 
-        // Show score popup
+        // ============ UI HELPERS ============
         function showScorePopup(x, y, text, color) {
             const popup = document.createElement('div');
             popup.className = 'score-popup';
@@ -691,14 +958,12 @@
             setTimeout(() => popup.remove(), 800);
         }
 
-        // Update combo bar
         function updateComboBar() {
             const bar = document.getElementById('combo-bar');
             const pct = Math.max(0, 100 - (comboTimer / comboTimeout) * 100);
             bar.style.width = pct + '%';
         }
 
-        // Combo break effect
         function showComboBreak() {
             if (combo >= 3) {
                 const el = document.getElementById('combo-break');
@@ -720,9 +985,9 @@
             } else {
                 display.style.display = 'none';
             }
+            if (combo > bestCombo) bestCombo = combo;
         }
 
-        // Calculate combo multiplier
         function getComboMultiplier() {
             if (combo >= 20) return 3;
             if (combo >= 10) return 2;
@@ -730,7 +995,6 @@
             return 1;
         }
 
-        // Activate power-up
         function activatePowerup(type) {
             playPowerupSound();
             if (type === 'double') {
@@ -752,10 +1016,11 @@
             }
         }
 
-        // Whack mole
+        // ============ WHACK ============
         function whackMole(moleData) {
             if (moleData.hit) return;
             moleData.hit = true;
+            totalHits++;
 
             const pos = moleData.mesh.position.clone();
             pos.y = 1;
@@ -764,9 +1029,9 @@
             const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
 
             if (moleData.isPowerup) {
-                // Collect power-up
                 activatePowerup(moleData.powerupType);
                 showScorePopup(x, y, moleData.powerupType === 'double' ? '2倍得分！' : '冻结！', moleData.powerupType === 'double' ? '#ffd700' : '#4ecdc4');
+                spawnHitParticles(pos.x, pos.y, pos.z, moleData.powerupType === 'double' ? 0xffd700 : 0x4ecdc4, 20);
                 hideMole(moleData);
                 return;
             }
@@ -774,7 +1039,6 @@
             const type = moleData.moleType;
 
             if (type === 'bomb') {
-                // Bomb: lose points, break combo
                 playBombSound();
                 let pts = -20;
                 if (doubleScoreActive) pts *= 2;
@@ -782,9 +1046,9 @@
                 document.getElementById('score-display').textContent = score;
                 showHitEffect(x, y, '#ff0000');
                 showScorePopup(x, y, pts + '', '#ff4444');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 25);
                 showComboBreak();
             } else if (type === 'golden') {
-                // Golden mole
                 playGoldenSound();
                 combo++;
                 lastHitTime = Date.now();
@@ -796,9 +1060,10 @@
                 document.getElementById('score-display').textContent = score;
                 showHitEffect(x, y, '#ffd700');
                 showScorePopup(x, y, '+' + pts, '#ffd700');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xffd700, 20);
                 playWhackSound();
+                setMoleHitExpression(moleData.mesh, type);
             } else {
-                // Normal mole
                 playWhackSound();
                 combo++;
                 lastHitTime = Date.now();
@@ -810,11 +1075,12 @@
                 document.getElementById('score-display').textContent = score;
                 showHitEffect(x, y, '#ff6b6b');
                 showScorePopup(x, y, '+' + pts, '#ff6b6b');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xff6b6b, 15);
+                setMoleHitExpression(moleData.mesh, type);
             }
 
             updateComboDisplay();
 
-            // Milestone check
             if (score >= 10 && score > lastMilestone) {
                 lastMilestone = score;
                 playMilestoneSound();
@@ -851,6 +1117,7 @@
             setTimeout(() => effect.remove(), 400);
         }
 
+        // ============ INPUT ============
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         const crosshairEl = document.getElementById('crosshair');
@@ -863,7 +1130,7 @@
         }
 
         function onMouseDown(event) {
-            if (!gameRunning) return;
+            if (!gameRunning || gamePaused) return;
             crosshairEl.classList.add('slam');
         }
         function onMouseUp(event) {
@@ -871,26 +1138,27 @@
         }
 
         function onClick(event) {
-            if (!gameRunning) return;
+            if (!gameRunning || gamePaused) return;
+            totalClicks++;
             crosshairEl.classList.add('slam');
             setTimeout(() => crosshairEl.classList.remove('slam'), 100);
             
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children, true);
+            const intersects = raycaster.intersectObjects(scene3.children, true);
             
             for (const intersect of intersects) {
                 let obj = intersect.object;
-                while (obj.parent && !obj.userData.isMole && !obj.userData.isPowerup) {
+                while (obj.parent && !obj.userData?.isMole && !obj.userData?.isPowerup) {
                     obj = obj.parent;
                 }
-                if (obj.userData.isMole && !obj.userData.hit) {
+                if (obj.userData?.isMole && !obj.userData.hit) {
                     const moleData = moles.find(m => m.mesh === obj);
                     if (moleData && !moleData.hit && moleData.state !== 'hiding') {
                         whackMole(moleData);
                         break;
                     }
                 }
-                if (obj.userData.isPowerup && !obj.userData.hit) {
+                if (obj.userData?.isPowerup && !obj.userData.hit) {
                     const moleData = moles.find(m => m.mesh === obj);
                     if (moleData && !moleData.hit) {
                         whackMole(moleData);
@@ -905,29 +1173,53 @@
         window.addEventListener('mouseup', onMouseUp);
         window.addEventListener('click', onClick);
 
-        // Game loop
+        // Pause button
+        document.getElementById('pause-btn').addEventListener('click', togglePause);
+        document.getElementById('resume-btn').addEventListener('click', togglePause);
+        document.getElementById('quit-btn').addEventListener('click', goToStart);
+
+        function togglePause() {
+            if (!gameRunning) return;
+            gamePaused = !gamePaused;
+            playPauseSound();
+            
+            if (gamePaused) {
+                pausedTime = Date.now();
+                document.getElementById('pause-overlay').style.display = 'flex';
+                document.getElementById('pause-btn').textContent = '▶';
+            } else {
+                totalPausedTime += Date.now() - pausedTime;
+                document.getElementById('pause-overlay').style.display = 'none';
+                document.getElementById('pause-btn').textContent = '⏸';
+            }
+        }
+
+        function goToStart() {
+            gamePaused = false;
+            gameRunning = false;
+            document.getElementById('pause-overlay').style.display = 'none';
+            document.getElementById('game-over-screen').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+            document.getElementById('crosshair').style.display = 'none';
+            document.getElementById('pause-btn').style.display = 'none';
+            document.getElementById('combo-bar-container').style.display = 'none';
+        }
+
+        // ============ GAME LOOP ============
         let lastSpawnTime = 0;
         const spawnInterval = 1200;
 
         function spawnLoop(time) {
-            if (gameRunning && time - lastSpawnTime > spawnInterval) {
+            if (gameRunning && !gamePaused && time - lastSpawnTime > spawnInterval) {
                 const available = holes.map((h, i) => i).filter(i => !holes[i].occupied);
                 if (available.length > 0) {
                     const holeIndex = available[Math.floor(Math.random() * available.length)];
-                    
-                    // Random spawn: normal 70%, golden 10%, bomb 10%, power-ups 10%
                     const rand = Math.random();
-                    if (rand < 0.08) {
-                        showMole(holeIndex, 'golden');
-                    } else if (rand < 0.16) {
-                        showMole(holeIndex, 'bomb');
-                    } else if (rand < 0.19) {
-                        showPowerup(holeIndex, 'double');
-                    } else if (rand < 0.22) {
-                        showPowerup(holeIndex, 'freeze');
-                    } else {
-                        showMole(holeIndex, 'normal');
-                    }
+                    if (rand < 0.08) showMole(holeIndex, 'golden');
+                    else if (rand < 0.16) showMole(holeIndex, 'bomb');
+                    else if (rand < 0.19) showPowerup(holeIndex, 'double');
+                    else if (rand < 0.22) showPowerup(holeIndex, 'freeze');
+                    else showMole(holeIndex, 'normal');
                     lastSpawnTime = time;
                 }
             }
@@ -935,20 +1227,16 @@
         }
         requestAnimationFrame(spawnLoop);
 
-        // Mole timeout + combo decay
+        // Game tick
         setInterval(() => {
-            if (!gameRunning) return;
+            if (!gameRunning || gamePaused) return;
 
-            // Combo timer decay
             if (combo > 0) {
                 comboTimer++;
                 updateComboBar();
-                if (comboTimer >= comboTimeout) {
-                    showComboBreak();
-                }
+                if (comboTimer >= comboTimeout) showComboBreak();
             }
 
-            // Mole timeout (freeze pauses it)
             moles.forEach(moleData => {
                 if (moleData.hit || moleData.isPowerup) return;
                 moleData.timer++;
@@ -961,19 +1249,27 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            renderer.render(scene, camera);
+            updateParticles();
+            renderer.render(scene3, camera);
         }
         animate();
 
+        // ============ GAME FLOW ============
         function startGame() {
             score = 0;
             timeLeft = 30;
             gameRunning = true;
+            gamePaused = false;
             lastMilestone = 0;
             praiseIndex = 0;
             combo = 0;
             comboTimer = 0;
             lastHitTime = 0;
+            totalClicks = 0;
+            totalHits = 0;
+            bestCombo = 0;
+            gameStartTime = Date.now();
+            totalPausedTime = 0;
             doubleScoreActive = false;
             freezeActive = false;
             if (doubleScoreTimer) clearTimeout(doubleScoreTimer);
@@ -984,16 +1280,19 @@
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('game-over-screen').style.display = 'none';
             document.getElementById('crosshair').style.display = 'block';
+            document.getElementById('pause-btn').style.display = 'block';
+            document.getElementById('pause-btn').textContent = '⏸';
             document.getElementById('combo-display').style.display = 'none';
-            document.getElementById('combo-bar-container').style.display = 'none';
+            document.getElementById('combo-bar-container').style.display = 'block';
             document.getElementById('badge-double').classList.remove('active');
             document.getElementById('badge-freeze').classList.remove('active');
             
-            moles.forEach(m => { if (m.mesh.parent) scene.remove(m.mesh); });
+            moles.forEach(m => { if (m.mesh.parent) scene3.remove(m.mesh); });
             moles = [];
             holes.forEach(h => { h.occupied = false; h.mole = null; });
             
             gameTimer = setInterval(() => {
+                if (gamePaused) return;
                 timeLeft--;
                 document.getElementById('time-display').textContent = timeLeft;
                 if (timeLeft <= 0) endGame();
@@ -1004,14 +1303,36 @@
             gameRunning = false;
             clearInterval(gameTimer);
             document.getElementById('crosshair').style.display = 'none';
+            document.getElementById('pause-btn').style.display = 'none';
             document.getElementById('combo-bar-container').style.display = 'none';
-            document.getElementById('final-score').textContent = score;
+            document.getElementById('pause-overlay').style.display = 'none';
+
+            const finalScore = score;
+            const isNewRecord = finalScore > getHighScore();
+            if (isNewRecord) setHighScore(finalScore);
+
+            const effectiveTime = Math.floor((Date.now() - gameStartTime - totalPausedTime) / 1000);
+            const accuracy = totalClicks > 0 ? Math.round((totalHits / totalClicks) * 100) : 0;
+
+            document.getElementById('final-score').textContent = finalScore;
+            document.getElementById('stat-accuracy').textContent = accuracy + '%';
+            document.getElementById('stat-combo').textContent = bestCombo + 'x';
+            document.getElementById('stat-hits').textContent = totalHits;
+            document.getElementById('stat-time').textContent = effectiveTime + 's';
+
+            const recordBadge = document.getElementById('high-score-badge-end');
+            recordBadge.style.display = isNewRecord ? 'block' : 'none';
+
             document.getElementById('game-over-screen').style.display = 'flex';
             moles.forEach(m => { if (!m.hit) hideMole(m); });
         }
 
+        // Initialize high score display
+        document.getElementById('high-score-val').textContent = getHighScore();
+
         document.getElementById('start-btn').addEventListener('click', startGame);
         document.getElementById('restart-btn').addEventListener('click', startGame);
+        document.getElementById('home-btn').addEventListener('click', goToStart);
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
