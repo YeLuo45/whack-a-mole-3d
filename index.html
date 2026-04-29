@@ -1485,6 +1485,17 @@
 
         // Initialize
         document.getElementById('info').style.display = 'none';
+
+        // Debug export for test validation
+        window.__GAME_DEBUG__ = {
+            get currentScreen() { return currentScreen; },
+            get score() { return score; },
+            get gameRunning() { return gameRunning; },
+            get gameMode() { return gameMode; },
+            get coins() { return coins; },
+            get stamina() { return typeof getStamina === 'function' ? getStamina() : null; },
+            get gameData() { return JSON.parse(JSON.stringify(gameData)); }
+        };
     </script>
 </body>
 </html>
