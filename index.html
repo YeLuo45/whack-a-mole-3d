@@ -1342,6 +1342,23 @@
         });
 
         document.body.style.cursor = 'none';
+
+        // Debug export for test validation (function closure accesses module scope)
+        window.__getGameState = function() {
+            try {
+                return {
+                    currentScreen: typeof currentScreen !== 'undefined' ? currentScreen : null,
+                    score: typeof score !== 'undefined' ? score : null,
+                    gameRunning: typeof gameRunning !== 'undefined' ? gameRunning : null,
+                    gameMode: typeof gameMode !== 'undefined' ? gameMode : null,
+                    coins: typeof coins !== 'undefined' ? coins : null,
+                    stamina: typeof getStamina === 'function' ? getStamina() : null,
+                    gameData: typeof gameData !== 'undefined' ? JSON.parse(JSON.stringify(gameData)) : null
+                };
+            } catch(e) {
+                return { error: e.message };
+            }
+        };
     </script>
 </body>
 </html>
