@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D 打地鼠</title>
+    <title>3D 打地鼠 - V2</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -11,62 +11,11 @@
             background: linear-gradient(135deg, #1a472a 0%, #2d5a3f 50%, #1a472a 100%);
             font-family: 'Segoe UI', sans-serif;
         }
-        #info {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #ffd700;
-            font-size: 28px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            z-index: 100;
-            display: flex;
-            gap: 40px;
-        }
-        #info span { 
-            background: rgba(0,0,0,0.4);
-            padding: 8px 20px;
-            border-radius: 20px;
-            border: 2px solid rgba(255,215,0,0.3);
-        }
-        #score-display { color: #ff6b6b; }
-        #time-display { color: #4ecdc4; }
-        #start-screen, #game-over-screen {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 200;
-        }
-        #game-over-screen { display: none; }
-        h1 { color: #ffd700; font-size: 56px; margin-bottom: 20px; text-shadow: 3px 3px 6px rgba(0,0,0,0.5); }
-        h2 { color: #ff6b6b; font-size: 42px; margin-bottom: 20px; }
-        .subtitle { color: #aaa; font-size: 20px; margin-bottom: 40px; }
-        .btn {
-            background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
-            color: #1a472a;
-            border: none;
-            padding: 18px 50px;
-            font-size: 24px;
-            font-weight: bold;
-            border-radius: 30px;
-            cursor: pointer;
-            transition: transform 0.1s, box-shadow 0.1s;
-            box-shadow: 0 6px 20px rgba(255,215,0,0.4);
-        }
-        .btn:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(255,215,0,0.6); }
-        .btn:active { transform: scale(0.98); }
-        #final-score { color: #ffd700; font-size: 64px; margin: 20px 0; }
-        .instructions { color: #888; font-size: 16px; margin-top: 30px; max-width: 400px; text-align: center; line-height: 1.6; }
         #crosshair {
             position: fixed;
             width: 40px; height: 40px;
             pointer-events: none;
-            z-index: 50;
+            z-index: 100;
             transform: translate(-50%, -50%);
             display: none;
         }
@@ -90,28 +39,42 @@
             0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
             100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
         }
+        #ui-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 50;
+            pointer-events: none;
+        }
+        .btn {
+            background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
+            color: #1a472a;
+            border: none;
+            padding: 18px 50px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            box-shadow: 0 6px 20px rgba(255,215,0,0.4);
+            pointer-events: auto;
+        }
+        .btn:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(255,215,0,0.6); }
+        .btn:active { transform: scale(0.98); }
+        .btn-small {
+            padding: 10px 25px;
+            font-size: 16px;
+            border-radius: 20px;
+        }
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+    <canvas id="ui-canvas"></canvas>
     <div id="crosshair"></div>
-    
-    <div id="info">
-        <span>得分: <b id="score-display">0</b></span>
-        <span>时间: <b id="time-display">30</b>s</span>
-    </div>
-
-    <div id="start-screen">
-        <h1>3D 打地鼠</h1>
-        <p class="subtitle">考验你的反应速度！</p>
-        <button class="btn" id="start-btn">开始游戏</button>
-        <p class="instructions">用鼠标瞄准地鼠，点击左键敲打。<br>30秒内尽可能多地击中地鼠！</p>
-    </div>
-
-    <div id="game-over-screen">
-        <h2>时间到！</h2>
-        <div id="final-score">0</div>
-        <button class="btn" id="restart-btn">再来一局</button>
-    </div>
 
     <script type="importmap">
     {
@@ -124,18 +87,714 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // Game state
-        let score = 0;
-        let timeLeft = 30;
-        let gameRunning = false;
-        let gameTimer = null;
-        let moles = [];
-        let activeMole = null;
+        // ==================== GAME DATA & STATE ====================
+        const SAVE_KEY = 'whackamole_v2_save';
+        const WORLDS = ['森林', '矿山', '冰原'];
+        const WORLD_THEMES = [
+            { bg: 0x1a472a, ground: 0x3d7a4a, fog: 0x1a472a },
+            { bg: 0x3d2817, ground: 0x5a4030, fog: 0x3d2817 },
+            { bg: 0x1a3a4a, ground: 0x3a6080, fog: 0x1a3a4a }
+        ];
+        const LEVELS_PER_WORLD = 10;
+        const STAR_THRESHOLDS = [500, 1000, 2000];
+        
+        const MOLE_SKINS = ['普通', '工程师', '僵尸', '恐龙', '机甲'];
+        const HAMMER_SKINS = ['木', '金', '火', '雷电'];
+        const MOLE_SKIN_COLORS = [
+            { body: 0x8B6914, head: 0x8B6914 },  // 普通
+            { body: 0x888888, head: 0x666666 },  // 工程师
+            { body: 0x556B2F, head: 0x6B8E23 },  // 僵尸
+            { body: 0x228B22, head: 0x32CD32 },  // 恐龙
+            { body: 0x4A4A4A, head: 0x696969 }   // 机甲
+        ];
+        const HAMMER_COLORS = [0x8B4513, 0xFFD700, 0xFF4500, 0x9370DB];
+        
+        const SHOP_ITEMS = {
+            passive: [
+                { id: 'speed', name: '攻速+5%', desc: '地鼠冒出速度+5%', cost: 500, maxLevel: 10, icon: '⚡' },
+                { id: 'life', name: '额外生命+1', desc: '初始生命+1', cost: 800, maxLevel: 3, icon: '❤' },
+                { id: 'vision', name: '视野扩大+10%', desc: '视野范围+10%', cost: 600, maxLevel: 5, icon: '👁' }
+            ],
+            moleSkins: [
+                { id: 'skin_engineer', name: '工程师地鼠', cost: 1000, skinIndex: 1 },
+                { id: 'skin_zombie', name: '僵尸地鼠', cost: 1500, skinIndex: 2 },
+                { id: 'skin_dino', name: '恐龙地鼠', cost: 2000, skinIndex: 3 },
+                { id: 'skin_mech', name: '机甲地鼠', cost: 3000, skinIndex: 4 }
+            ],
+            hammerSkins: [
+                { id: 'hammer_gold', name: '黄金锤子', cost: 1200, skinIndex: 1 },
+                { id: 'hammer_fire', name: '烈焰锤子', cost: 1800, skinIndex: 2 },
+                { id: 'hammer_thunder', name: '雷电锤子', cost: 2500, skinIndex: 3 }
+            ]
+        };
 
-        // Three.js setup
+        let defaultSave = () => ({
+            coins: 0,
+            stamina: 10,
+            staminaTime: Date.now(),
+            levels: Array(3).fill(null).map(() => Array(10).fill(0)),
+            unlockedWorlds: [true, false, false],
+            passiveLevels: { speed: 0, life: 0, vision: 0 },
+            ownedMoleSkins: [true, false, false, false, false],
+            ownedHammerSkins: [true, false, false, false],
+            equippedMoleSkin: 0,
+            equippedHammerSkin: 0,
+            settings: { sound: true }
+        });
+
+        let gameData = loadGame();
+
+        function loadGame() {
+            try {
+                let data = JSON.parse(localStorage.getItem(SAVE_KEY));
+                if (!data) data = defaultSave();
+                // Ensure all fields exist
+                let fresh = defaultSave();
+                for (let k in fresh) if (data[k] === undefined) data[k] = fresh[k];
+                return data;
+            } catch { return defaultSave(); }
+        }
+
+        function saveGame() {
+            gameData.staminaTime = Date.now();
+            localStorage.setItem(SAVE_KEY, JSON.stringify(gameData));
+        }
+
+        function getStamina() {
+            let s = gameData.stamina;
+            let elapsed = (Date.now() - gameData.staminaTime) / 1000;
+            let recovered = Math.floor(elapsed / 300);
+            return Math.min(10, s + recovered);
+        }
+
+        function useStamina() {
+            let s = getStamina();
+            if (s <= 0) return false;
+            gameData.stamina = s - 1;
+            saveGame();
+            return true;
+        }
+
+        function getEquippedMoleSkin() { return gameData.equippedMoleSkin; }
+        function getEquippedHammerSkin() { return gameData.equippedHammerSkin; }
+        function getPassiveSpeedBonus() { return 1 + gameData.passiveLevels.speed * 0.05; }
+        function getPassiveLifeBonus() { return gameData.passiveLevels.life; }
+        function getPassiveVisionBonus() { return 1 + gameData.passiveLevels.vision * 0.1; }
+
+        // ==================== UI SYSTEM ====================
+        const canvas = document.getElementById('ui-canvas');
+        const ctx = canvas.getContext('2d');
+        let uiButtons = [];
+        let currentScreen = 'menu';
+        let selectedLevel = null;
+        let selectedWorld = 0;
+        let selectedInstantItem = null;
+        let shopTab = 'passive';
+        let gachaAnimating = false;
+        let gachaResult = [];
+
+        function resizeUI() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeUI);
+        resizeUI();
+
+        function isPointInButton(px, py, btn) {
+            return px >= btn.x && px <= btn.x + btn.w && py >= btn.y && py <= btn.y + btn.h;
+        }
+
+        function addButton(x, y, w, h, label, action, style = 'normal', color = '#ffd700') {
+            uiButtons.push({ x, y, w, h, label, action, style, color });
+        }
+
+        function clearButtons() { uiButtons = []; }
+
+        function drawButton(btn, hovered) {
+            ctx.save();
+            let scale = hovered ? 1.02 : 1;
+            let cx = btn.x + btn.w / 2, cy = btn.y + btn.h / 2;
+            ctx.translate(cx, cy);
+            ctx.scale(scale, scale);
+            ctx.translate(-cx, -cy);
+
+            let gradient = ctx.createLinearGradient(btn.x, btn.y, btn.x, btn.y + btn.h);
+            if (btn.style === 'disabled') {
+                gradient.addColorStop(0, '#666');
+                gradient.addColorStop(1, '#444');
+            } else if (btn.style === 'danger') {
+                gradient.addColorStop(0, '#ff6b6b');
+                gradient.addColorStop(1, '#c44');
+            } else if (btn.style === 'success') {
+                gradient.addColorStop(0, '#4ecdc4');
+                gradient.addColorStop(1, '#2a9d8f');
+            } else {
+                gradient.addColorStop(0, btn.color);
+                gradient.addColorStop(1, shadeColor(btn.color, -30));
+            }
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 12);
+            ctx.fill();
+            
+            ctx.shadowColor = 'rgba(0,0,0,0.3)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetY = 4;
+            
+            ctx.fillStyle = btn.style === 'disabled' ? '#999' : (btn.style === 'success' ? '#fff' : '#1a472a');
+            ctx.font = `bold ${Math.min(20, btn.w / 8)}px Segoe UI`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
+            ctx.restore();
+        }
+
+        function shadeColor(color, percent) {
+            let num = parseInt(color.replace('#', ''), 16);
+            let amt = Math.round(2.55 * percent);
+            let R = Math.min(255, Math.max(0, (num >> 16) + amt));
+            let G = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amt));
+            let B = Math.min(255, Math.max(0, (num & 0x0000FF) + amt));
+            return `rgb(${R},${G},${B})`;
+        }
+
+        function drawStar(x, y, size, filled) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                let angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+                let r = i % 2 === 0 ? size : size / 2;
+                if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
+                else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+            }
+            ctx.closePath();
+            ctx.fillStyle = filled ? '#ffd700' : '#555';
+            ctx.fill();
+            if (filled) {
+                ctx.strokeStyle = '#ff8c00';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawStars(x, y, count, size = 15) {
+            for (let i = 0; i < 3; i++) {
+                drawStar(x + i * size * 2, y, size, i < count);
+            }
+        }
+
+        // ==================== MENU SCREEN ====================
+        function drawMenuScreen() {
+            clearButtons();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let cx = canvas.width / 2;
+            
+            // Title
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 56px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.fillText('3D 打地鼠', cx, 120);
+            
+            ctx.fillStyle = '#aaa';
+            ctx.font = '20px Segoe UI';
+            ctx.fillText('V2 进度版', cx, 170);
+
+            // Coins & Stamina
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 22px Segoe UI';
+            ctx.fillText(`💰 ${gameData.coins}`, cx - 100, 220);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.fillText(`⚡ ${getStamina()}/10`, cx + 100, 220);
+
+            // Buttons
+            let btnW = 250, btnH = 60, startY = 280;
+            addButton(cx - btnW/2, startY, btnW, btnH, '🎮 开始游戏', () => { currentScreen = 'modeSelect'; });
+            addButton(cx - btnW/2, startY + 80, btnW, btnH, '📋 关卡选择', () => { currentScreen = 'levelSelect'; selectedWorld = 0; });
+            addButton(cx - btnW/2, startY + 160, btnW, btnH, '🛒 商店', () => { currentScreen = 'shop'; shopTab = 'passive'; });
+            addButton(cx - btnW/2, startY + 240, btnW, btnH, '🎁 收藏', () => { currentScreen = 'collection'; });
+
+            // Draw buttons
+            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+        }
+
+        // ==================== MODE SELECT SCREEN ====================
+        function drawModeSelectScreen() {
+            clearButtons();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let cx = canvas.width / 2;
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 42px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.fillText('选择模式', cx, 100);
+
+            // Check stamina for classic
+            let staminaOK = getStamina() > 0;
+            let btnW = 300, btnH = 80, startY = 200;
+            
+            addButton(cx - btnW/2, startY, btnW, btnH, '🏆 经典模式', () => { 
+                if (useStamina()) { currentScreen = 'playing'; gameMode = 'classic'; startClassicGame(); }
+            }, staminaOK ? 'normal' : 'disabled');
+            
+            addButton(cx - btnW/2, startY + 100, btnW, btnH, '📍 关卡模式', () => { 
+                if (useStamina()) { currentScreen = 'instantItemSelect'; }
+            }, staminaOK ? 'normal' : 'disabled');
+
+            // Show stamina warning
+            if (!staminaOK) {
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = '18px Segoe UI';
+                ctx.fillText('体力不足，请稍后再来', cx, startY + 210);
+            }
+
+            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'menu'; }, 'success');
+            
+            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+        }
+
+        // ==================== INSTANT ITEM SELECT SCREEN ====================
+        const INSTANT_ITEMS = [
+            { id: 'slow', name: '减速手套', desc: '地鼠冒出速度-50%', icon: '🦾', cost: 0 },
+            { id: 'double', name: '双倍积分', desc: '得分×2', icon: '✌️', cost: 0 },
+            { id: 'super', name: '超级锤子', desc: '必定命中，5次', icon: '🔨', cost: 0 }
+        ];
+
+        function drawInstantItemSelectScreen() {
+            clearButtons();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let cx = canvas.width / 2;
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 42px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.fillText('选择道具', cx, 80);
+            
+            ctx.fillStyle = '#aaa';
+            ctx.font = '16px Segoe UI';
+            ctx.fillText('（局前选择，局内使用）', cx, 115);
+
+            // Instant items
+            let itemY = 170;
+            INSTANT_ITEMS.forEach((item, i) => {
+                let selected = selectedInstantItem === item.id;
+                let btnW = 350, btnH = 70;
+                addButton(cx - btnW/2, itemY + i * 90, btnW, btnH, `${item.icon} ${item.name}`, () => {
+                    selectedInstantItem = selectedInstantItem === item.id ? null : item.id;
+                }, 'normal', selected ? '#4ecdc4' : '#ffd700');
+                
+                ctx.fillStyle = selected ? '#4ecdc4' : '#888';
+                ctx.font = '14px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.fillText(item.desc, cx, itemY + i * 90 + 45);
+            });
+
+            addButton(cx - 150, itemY + 300, 300, 60, '开始游戏', () => {
+                currentScreen = 'levelSelect';
+            });
+
+            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'modeSelect'; }, 'success');
+            
+            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+        }
+
+        // ==================== LEVEL SELECT SCREEN ====================
+        function drawLevelSelectScreen() {
+            clearButtons();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // World tabs
+            let tabY = 30;
+            let tabW = 120, tabH = 45;
+            for (let w = 0; w < 3; w++) {
+                let unlocked = gameData.unlockedWorlds[w];
+                let selected = selectedWorld === w;
+                addButton(50 + w * (tabW + 15), tabY, tabW, tabH, (unlocked ? '' : '🔒 ') + WORLDS[w], () => {
+                    if (unlocked) selectedWorld = w;
+                }, unlocked ? 'normal' : 'disabled', selected ? '#4ecdc4' : '#ffd700');
+            }
+
+            // Level grid
+            let gridStartX = 80, gridStartY = 120;
+            let cellW = 90, cellH = 100, gap = 15;
+            
+            for (let l = 0; l < 10; l++) {
+                let col = l % 5, row = Math.floor(l / 5);
+                let x = gridStartX + col * (cellW + gap);
+                let y = gridStartY + row * (cellH + gap);
+                let worldComplete = isWorldComplete(selectedWorld);
+                let levelUnlocked = isLevelUnlocked(selectedWorld, l);
+                let stars = gameData.levels[selectedWorld][l];
+                
+                let canPlay = levelUnlocked && getStamina() > 0;
+                addButton(x, y, cellW, cellH, levelUnlocked ? `${l + 1}关` : '🔒', () => {
+                    if (canPlay) {
+                        selectedLevel = { world: selectedWorld, level: l };
+                        currentScreen = 'playing';
+                        gameMode = 'level';
+                        startLevelGame(selectedWorld, l);
+                    }
+                }, canPlay ? 'normal' : 'disabled');
+                
+                if (levelUnlocked) {
+                    drawStars(x + cellW/2 - 22, y + cellH - 25, stars, 10);
+                }
+            }
+
+            // World info
+            ctx.fillStyle = '#aaa';
+            ctx.font = '16px Segoe UI';
+            ctx.textAlign = 'center';
+            let worldComplete2 = isWorldComplete(selectedWorld);
+            let nextUnlock = selectedWorld === 0 ? '矿山：森林10关全通' : (selectedWorld === 1 ? '冰原：矿山10关全通' : '已全部解锁');
+            ctx.fillText(nextUnlock, canvas.width / 2, 370);
+
+            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'instantItemSelect'; }, 'success');
+            
+            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+        }
+
+        function isWorldComplete(world) {
+            return gameData.levels[world].every(s => s >= 1);
+        }
+
+        function isLevelUnlocked(world, level) {
+            if (world === 0) return level === 0 || gameData.levels[0][level - 1] >= 1;
+            if (world === 1) return gameData.unlockedWorlds[1] && (level === 0 || gameData.levels[1][level - 1] >= 1);
+            if (world === 2) return gameData.unlockedWorlds[2] && (level === 0 || gameData.levels[2][level - 1] >= 1);
+            return false;
+        }
+
+        // ==================== SHOP SCREEN ====================
+        function drawShopScreen() {
+            clearButtons();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let cx = canvas.width / 2;
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 42px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.fillText('商店', cx, 50);
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 20px Segoe UI';
+            ctx.fillText(`💰 ${gameData.coins}`, cx, 90);
+
+            // Tabs
+            let tabs = ['passive', 'mole', 'hammer', 'gacha'];
+            let tabLabels = ['被动道具', '地鼠皮肤', '锤子皮肤', '盲盒'];
+            let tabW = 100, tabH = 40, tabY = 120;
+            tabs.forEach((t, i) => {
+                addButton(50 + i * (tabW + 10), tabY, tabW, tabH, tabLabels[i], () => { shopTab = t; }, shopTab === t ? 'normal' : 'disabled', shopTab === t ? '#4ecdc4' : '#ffd700');
+            });
+
+            // Items
+            let itemY = 190;
+            ctx.textAlign = 'left';
+            
+            if (shopTab === 'passive') {
+                SHOP_ITEMS.passive.forEach((item, i) => {
+                    let currentLevel = gameData.passiveLevels[item.id];
+                    let maxed = currentLevel >= item.maxLevel;
+                    let cost = item.cost * (currentLevel + 1);
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 20px Segoe UI';
+                    ctx.fillText(`${item.icon} ${item.name}`, 80, itemY + i * 80);
+                    ctx.fillStyle = '#aaa';
+                    ctx.font = '14px Segoe UI';
+                    ctx.fillText(`${item.desc} (${currentLevel}/${item.maxLevel})`, 80, itemY + i * 80 + 25);
+                    
+                    let btnX = 500, btnW = 120;
+                    if (!maxed) {
+                        addButton(btnX, itemY + i * 80 - 15, btnW, 40, `💰 ${cost}`, () => {
+                            if (gameData.coins >= cost) {
+                                gameData.coins -= cost;
+                                gameData.passiveLevels[item.id]++;
+                                saveGame();
+                            }
+                        }, gameData.coins >= cost ? 'normal' : 'disabled');
+                    } else {
+                        ctx.fillStyle = '#4ecdc4';
+                        ctx.font = 'bold 16px Segoe UI';
+                        ctx.fillText('已满级', btnX + 40, itemY + i * 80);
+                    }
+                });
+            } else if (shopTab === 'mole') {
+                SHOP_ITEMS.moleSkins.forEach((item, i) => {
+                    let owned = gameData.ownedMoleSkins[item.skinIndex];
+                    let equipped = gameData.equippedMoleSkin === item.skinIndex;
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 20px Segoe UI';
+                    ctx.fillText(`${item.name}`, 80, itemY + i * 70);
+                    
+                    let btnX = 500, btnW = 120;
+                    if (!owned) {
+                        addButton(btnX, itemY + i * 70 - 15, btnW, 40, `💰 ${item.cost}`, () => {
+                            if (gameData.coins >= item.cost) {
+                                gameData.coins -= item.cost;
+                                gameData.ownedMoleSkins[item.skinIndex] = true;
+                                saveGame();
+                            }
+                        }, gameData.coins >= item.cost ? 'normal' : 'disabled');
+                    } else if (!equipped) {
+                        addButton(btnX, itemY + i * 70 - 15, btnW, 40, '装备', () => {
+                            gameData.equippedMoleSkin = item.skinIndex;
+                            saveGame();
+                        }, 'normal', '#4ecdc4');
+                    } else {
+                        ctx.fillStyle = '#4ecdc4';
+                        ctx.font = 'bold 16px Segoe UI';
+                        ctx.fillText('已装备', btnX + 40, itemY + i * 70);
+                    }
+                });
+            } else if (shopTab === 'hammer') {
+                SHOP_ITEMS.hammerSkins.forEach((item, i) => {
+                    let owned = gameData.ownedHammerSkins[item.skinIndex];
+                    let equipped = gameData.equippedHammerSkin === item.skinIndex;
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 20px Segoe UI';
+                    ctx.fillText(`${item.name}`, 80, itemY + i * 70);
+                    
+                    let btnX = 500, btnW = 120;
+                    if (!owned) {
+                        addButton(btnX, itemY + i * 70 - 15, btnW, 40, `💰 ${item.cost}`, () => {
+                            if (gameData.coins >= item.cost) {
+                                gameData.coins -= item.cost;
+                                gameData.ownedHammerSkins[item.skinIndex] = true;
+                                saveGame();
+                            }
+                        }, gameData.coins >= item.cost ? 'normal' : 'disabled');
+                    } else if (!equipped) {
+                        addButton(btnX, itemY + i * 70 - 15, btnW, 40, '装备', () => {
+                            gameData.equippedHammerSkin = item.skinIndex;
+                            saveGame();
+                        }, 'normal', '#4ecdc4');
+                    } else {
+                        ctx.fillStyle = '#4ecdc4';
+                        ctx.font = 'bold 16px Segoe UI';
+                        ctx.fillText('已装备', btnX + 40, itemY + i * 70);
+                    }
+                });
+            } else if (shopTab === 'gacha') {
+                ctx.fillStyle = '#fff';
+                ctx.font = '20px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.fillText('🎰 盲盒抽取', cx, itemY - 10);
+                ctx.fillStyle = '#aaa';
+                ctx.font = '16px Segoe UI';
+                ctx.fillText('10连抽保底R，100金币/次', cx, itemY + 20);
+                
+                let btnW = 200, btnH = 60;
+                addButton(cx - btnW/2, itemY + 50, btnW, btnH, '🎁 10连抽 💰100', () => {
+                    if (!gachaAnimating && gameData.coins >= 100) {
+                        gameData.coins -= 100;
+                        saveGame();
+                        doGacha();
+                    }
+                }, gameData.coins >= 100 ? 'normal' : 'disabled');
+                
+                // Gacha result display
+                if (gachaResult.length > 0) {
+                    ctx.fillStyle = '#ffd700';
+                    ctx.font = 'bold 24px Segoe UI';
+                    ctx.fillText('抽取结果', cx, itemY + 140);
+                    gachaResult.forEach((r, i) => {
+                        let col = i % 5, row = Math.floor(i / 5);
+                        ctx.fillStyle = r.rarity === 'SR' ? '#ff6b6b' : r.rarity === 'R' ? '#4ecdc4' : '#ffd700';
+                        ctx.font = 'bold 18px Segoe UI';
+                        ctx.fillText(r.name, cx - 150 + col * 75, itemY + 170 + row * 35);
+                    });
+                }
+            }
+
+            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'menu'; gachaResult = []; }, 'success');
+            
+            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+        }
+
+        function doGacha() {
+            gachaResult = [];
+            let rollCount = 10;
+            let guaranteedR = false;
+            
+            for (let i = 0; i < rollCount; i++) {
+                let isR = i === 9 || Math.random() < 0.15;
+                if (isR) guaranteedR = true;
+                
+                let type = Math.random();
+                let item;
+                if (type < 0.4) {
+                    // Mole skin
+                    let owned = gameData.ownedMoleSkins.map((o, idx) => o ? -1 : idx).filter(idx => idx > 0);
+                    if (owned.length > 0) {
+                        let idx = owned[Math.floor(Math.random() * owned.length)];
+                        item = { type: 'mole', name: MOLE_SKINS[idx], rarity: 'R', skinIndex: idx };
+                        gameData.ownedMoleSkins[idx] = true;
+                    } else { item = { type: 'mole', name: '金币+50', rarity: 'N', skinIndex: 0 }; }
+                } else if (type < 0.7) {
+                    // Hammer skin
+                    let owned = gameData.ownedHammerSkins.map((o, idx) => o ? -1 : idx).filter(idx => idx > 0);
+                    if (owned.length > 0) {
+                        let idx = owned[Math.floor(Math.random() * owned.length)];
+                        item = { type: 'hammer', name: HAMMER_SKINS[idx], rarity: 'R', skinIndex: idx };
+                        gameData.ownedHammerSkins[idx] = true;
+                    } else { item = { type: 'hammer', name: '金币+50', rarity: 'N', skinIndex: 0 }; }
+                } else {
+                    // Coins
+                    item = { type: 'coins', name: `金币+${guaranteedR ? 200 : 100}`, rarity: 'N' };
+                    gameData.coins += guaranteedR ? 200 : 100;
+                }
+                gachaResult.push(item);
+            }
+            saveGame();
+            gachaAnimating = false;
+        }
+
+        // ==================== COLLECTION SCREEN ====================
+        function drawCollectionScreen() {
+            clearButtons();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let cx = canvas.width / 2;
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 42px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.fillText('我的收藏', cx, 60);
+
+            // Mole skins
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 24px Segoe UI';
+            ctx.fillText('地鼠皮肤', cx, 120);
+            
+            for (let i = 0; i < 5; i++) {
+                let owned = gameData.ownedMoleSkins[i];
+                let equipped = gameData.equippedMoleSkin === i;
+                let x = 100 + i * 130;
+                
+                ctx.fillStyle = owned ? '#ffd700' : '#555';
+                ctx.fillRect(x, 140, 110, 80);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.fillText(MOLE_SKINS[i], x + 55, 170);
+                ctx.fillText(owned ? (equipped ? '✓ 已装备' : '已拥有') : '未拥有', x + 55, 195);
+                
+                if (owned && !equipped) {
+                    let btnW = 80;
+                    addButton(x + 15, 230, btnW, 35, '装备', () => {
+                        gameData.equippedMoleSkin = i;
+                        saveGame();
+                    }, 'normal', '#4ecdc4');
+                }
+            }
+
+            // Hammer skins
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 24px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.fillText('锤子皮肤', cx, 310);
+            
+            for (let i = 0; i < 4; i++) {
+                let owned = gameData.ownedHammerSkins[i];
+                let equipped = gameData.equippedHammerSkin === i;
+                let x = 130 + i * 130;
+                
+                ctx.fillStyle = owned ? '#ffd700' : '#555';
+                ctx.fillRect(x, 330, 110, 80);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.fillText(HAMMER_SKINS[i], x + 55, 360);
+                ctx.fillText(owned ? (equipped ? '✓ 已装备' : '已拥有') : '未拥有', x + 55, 385);
+                
+                if (owned && !equipped) {
+                    let btnW = 80;
+                    addButton(x + 15, 420, btnW, 35, '装备', () => {
+                        gameData.equippedHammerSkin = i;
+                        saveGame();
+                    }, 'normal', '#4ecdc4');
+                }
+            }
+
+            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'menu'; }, 'success');
+            
+            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+        }
+
+        // ==================== GAME OVER SCREEN ====================
+        let lastGameResult = null;
+        function drawGameOverScreen() {
+            if (!lastGameResult) return;
+            clearButtons();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let cx = canvas.width / 2;
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 48px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.fillText(lastGameResult.title, cx, 100);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '28px Segoe UI';
+            ctx.fillText(`得分: ${lastGameResult.score}`, cx, 180);
+            
+            // Stars
+            if (lastGameResult.stars !== undefined) {
+                drawStars(cx - 45, 230, lastGameResult.stars, 25);
+            }
+            
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = '22px Segoe UI';
+            ctx.fillText(`获得金币: ${lastGameResult.coins}`, cx, 300);
+
+            let btnW = 250, btnH = 60;
+            addButton(cx - btnW/2, 360, btnW, btnH, '返回主菜单', () => { 
+                currentScreen = 'menu'; lastGameResult = null; 
+            });
+            
+            if (lastGameResult.mode === 'level' && lastGameResult.world !== undefined) {
+                let nextLevel = lastGameResult.level + 1;
+                if (nextLevel < 10) {
+                    addButton(cx - btnW/2, 440, btnW, btnH, `下一关 (${nextLevel + 1}关)`, () => {
+                        selectedLevel = { world: lastGameResult.world, level: nextLevel };
+                        currentScreen = 'playing';
+                        gameMode = 'level';
+                        startLevelGame(lastGameResult.world, nextLevel);
+                    });
+                } else {
+                    ctx.fillStyle = '#ffd700';
+                    ctx.font = '20px Segoe UI';
+                    ctx.fillText('🎉 世界完成！', cx, 440);
+                }
+            }
+            
+            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+        }
+
+        // ==================== THREE.JS SETUP ====================
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a472a);
-        scene.fog = new THREE.Fog(0x1a472a, 15, 35);
+        scene.background = new THREE.Color(WORLD_THEMES[0].bg);
+        scene.fog = new THREE.Fog(WORLD_THEMES[0].bg, 15, 35);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 8, 10);
@@ -170,70 +829,93 @@
         scene.add(fillLight);
 
         // Ground
-        const groundGeo = new THREE.CircleGeometry(12, 64);
-        const groundMat = new THREE.MeshStandardMaterial({ 
-            color: 0x3d7a4a,
-            roughness: 0.9,
-            metalness: 0.0
-        });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        scene.add(ground);
-
-        // Grass detail - small patches
-        for (let i = 0; i < 200; i++) {
-            const patchGeo = new THREE.CircleGeometry(Math.random() * 0.1 + 0.05, 6);
-            const patchMat = new THREE.MeshStandardMaterial({ 
-                color: new THREE.Color().setHSL(0.25 + Math.random() * 0.1, 0.6, 0.3 + Math.random() * 0.15)
+        let ground, groundMat;
+        function createGround(theme) {
+            if (ground) scene.remove(ground);
+            const groundGeo = new THREE.CircleGeometry(12, 64);
+            groundMat = new THREE.MeshStandardMaterial({ 
+                color: theme.ground,
+                roughness: 0.9,
+                metalness: 0.0
             });
-            const patch = new THREE.Mesh(patchGeo, patchMat);
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * 10 + 2;
-            patch.position.set(Math.cos(angle) * radius, 0.01, Math.sin(angle) * radius);
-            patch.rotation.x = -Math.PI / 2;
-            scene.add(patch);
+            ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            scene.background = new THREE.Color(theme.bg);
+            scene.fog = new THREE.Fog(theme.bg, 15, 35);
         }
+        createGround(WORLD_THEMES[0]);
+
+        // Grass patches
+        let grassPatches = [];
+        function createGrassPatches(theme) {
+            grassPatches.forEach(p => scene.remove(p));
+            grassPatches = [];
+            for (let i = 0; i < 200; i++) {
+                const patchGeo = new THREE.CircleGeometry(Math.random() * 0.1 + 0.05, 6);
+                const patchMat = new THREE.MeshStandardMaterial({ 
+                    color: new THREE.Color().setHSL(0.25 + Math.random() * 0.1, 0.6, 0.3 + Math.random() * 0.15)
+                });
+                const patch = new THREE.Mesh(patchGeo, patchMat);
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * 10 + 2;
+                patch.position.set(Math.cos(angle) * radius, 0.01, Math.sin(angle) * radius);
+                patch.rotation.x = -Math.PI / 2;
+                scene.add(patch);
+                grassPatches.push(patch);
+            }
+        }
+        createGrassPatches(WORLD_THEMES[0]);
 
         // Holes
         const holes = [];
         const holeGroup = new THREE.Group();
         scene.add(holeGroup);
 
-        for (let row = 0; row < 3; row++) {
-            for (let col = 0; col < 3; col++) {
-                const x = (col - 1) * 3;
-                const z = (row - 1) * 3;
+        function createHoles() {
+            while (holeGroup.children.length > 0) {
+                holeGroup.remove(holeGroup.children[0]);
+            }
+            holes.length = 0;
+            
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    const x = (col - 1) * 3;
+                    const z = (row - 1) * 3;
 
-                // Hole rim (torus)
-                const rimGeo = new THREE.TorusGeometry(0.7, 0.15, 16, 32);
-                const rimMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 });
-                const rim = new THREE.Mesh(rimGeo, rimMat);
-                rim.rotation.x = -Math.PI / 2;
-                rim.position.set(x, 0.02, z);
-                rim.castShadow = true;
-                rim.receiveShadow = true;
-                holeGroup.add(rim);
+                    const rimGeo = new THREE.TorusGeometry(0.7, 0.15, 16, 32);
+                    const rimMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 });
+                    const rim = new THREE.Mesh(rimGeo, rimMat);
+                    rim.rotation.x = -Math.PI / 2;
+                    rim.position.set(x, 0.02, z);
+                    rim.castShadow = true;
+                    rim.receiveShadow = true;
+                    holeGroup.add(rim);
 
-                // Hole inner (dark circle)
-                const holeGeo = new THREE.CircleGeometry(0.6, 32);
-                const holeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
-                const holeMesh = new THREE.Mesh(holeGeo, holeMat);
-                holeMesh.rotation.x = -Math.PI / 2;
-                holeMesh.position.set(x, 0.01, z);
-                holeGroup.add(holeMesh);
+                    const holeGeo = new THREE.CircleGeometry(0.6, 32);
+                    const holeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
+                    const holeMesh = new THREE.Mesh(holeGeo, holeMat);
+                    holeMesh.rotation.x = -Math.PI / 2;
+                    holeMesh.position.set(x, 0.01, z);
+                    holeGroup.add(holeMesh);
 
-                holes.push({ x, z, occupied: false, mole: null });
+                    holes.push({ x, z, occupied: false, mole: null });
+                }
             }
         }
+        createHoles();
 
-        // Mole creation function
-        function createMole() {
+        // Mole creation with skin support
+        function createMole(skinIndex = 0) {
             const moleGroup = new THREE.Group();
+            const colors = MOLE_SKIN_COLORS[skinIndex] || MOLE_SKIN_COLORS[0];
+            const bodyMat = new THREE.MeshStandardMaterial({ color: colors.body, roughness: 0.7 });
+            const headMat = new THREE.MeshStandardMaterial({ color: colors.head, roughness: 0.7 });
 
             // Body
             const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
-            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.7 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.scale.set(1, 0.8, 1);
             body.position.y = 0.4;
@@ -242,14 +924,66 @@
 
             // Head
             const headGeo = new THREE.SphereGeometry(0.45, 32, 32);
-            const head = new THREE.Mesh(headGeo, bodyMat);
+            const head = new THREE.Mesh(headGeo, headMat);
             head.position.y = 0.9;
             head.castShadow = true;
             moleGroup.add(head);
 
+            // Engineer additions
+            if (skinIndex === 1) {
+                const helmetGeo = new THREE.SphereGeometry(0.48, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+                const helmetMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
+                const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+                helmet.position.y = 0.95;
+                helmet.rotation.x = Math.PI;
+                moleGroup.add(helmet);
+            }
+            
+            // Zombie additions
+            if (skinIndex === 2) {
+                const patchGeo = new THREE.CircleGeometry(0.1, 8);
+                const patchMat = new THREE.MeshStandardMaterial({ color: 0x556B2F });
+                for (let i = 0; i < 3; i++) {
+                    const patch = new THREE.Mesh(patchGeo, patchMat);
+                    patch.position.set(-0.2 + i * 0.2, 0.95, 0.3);
+                    patch.rotation.x = -Math.PI / 2;
+                    moleGroup.add(patch);
+                }
+            }
+            
+            // Dino additions
+            if (skinIndex === 3) {
+                const spikeGeo = new THREE.ConeGeometry(0.08, 0.3, 8);
+                const spikeMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                for (let i = 0; i < 5; i++) {
+                    const spike = new THREE.Mesh(spikeGeo, spikeMat);
+                    spike.position.set(-0.25 + i * 0.125, 1.35, 0);
+                    spike.rotation.z = (i - 2) * 0.15;
+                    moleGroup.add(spike);
+                }
+            }
+            
+            // Mech additions
+            if (skinIndex === 4) {
+                const visorGeo = new THREE.BoxGeometry(0.35, 0.15, 0.1);
+                const visorMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 });
+                const visor = new THREE.Mesh(visorGeo, visorMat);
+                visor.position.set(0, 1.0, 0.4);
+                moleGroup.add(visor);
+                
+                const earGeo = new THREE.BoxGeometry(0.1, 0.2, 0.1);
+                const earMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.9 });
+                const leftEar = new THREE.Mesh(earGeo, earMat);
+                leftEar.position.set(-0.38, 1.15, 0);
+                moleGroup.add(leftEar);
+                const rightEar = new THREE.Mesh(earGeo, earMat);
+                rightEar.position.set(0.38, 1.15, 0);
+                moleGroup.add(rightEar);
+            }
+
             // Snout
             const snoutGeo = new THREE.SphereGeometry(0.15, 16, 16);
-            const snoutMat = new THREE.MeshStandardMaterial({ color: 0x6B4E0A, roughness: 0.8 });
+            const snoutMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.body).multiplyScalar(0.7), roughness: 0.8 });
             const snout = new THREE.Mesh(snoutGeo, snoutMat);
             snout.position.set(0, 0.85, 0.38);
             snout.scale.set(1, 0.7, 1);
@@ -293,7 +1027,7 @@
             rightEar.castShadow = true;
             moleGroup.add(rightEar);
 
-            // Cheeks (blush)
+            // Cheeks
             const cheekGeo = new THREE.SphereGeometry(0.1, 16, 16);
             const cheekMat = new THREE.MeshStandardMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.5 });
             const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
@@ -315,15 +1049,27 @@
             rightTooth.position.set(0.06, 0.72, 0.4);
             moleGroup.add(rightTooth);
 
-            moleGroup.userData = { isMole: true, baseY: 0, hit: false };
+            moleGroup.userData = { isMole: true, baseY: 0, hit: false, skinIndex };
             return moleGroup;
         }
+
+        // Game state
+        let score = 0;
+        let combo = 0;
+        let timeLeft = 30;
+        let gameRunning = false;
+        let gameMode = 'classic';
+        let currentWorld = 0;
+        let currentLevel = 0;
+        let gameTimer = null;
+        let moles = [];
+        let instantItemUsed = { slow: false, double: false, super: 0 };
 
         // Show mole at hole
         function showMole(holeIndex) {
             if (holes[holeIndex].occupied) return;
             
-            const mole = createMole();
+            const mole = createMole(getEquippedMoleSkin());
             mole.position.set(holes[holeIndex].x, -1, holes[holeIndex].z);
             mole.userData.holeIndex = holeIndex;
             scene.add(mole);
@@ -332,9 +1078,10 @@
             holes[holeIndex].mole = mole;
             moles.push({ mesh: mole, holeIndex, state: 'rising', timer: 0, duration: 0, hit: false });
 
-            // Rising animation
             const targetY = 0.6;
-            const duration = 400;
+            let duration = 400 / getPassiveSpeedBonus();
+            if (selectedInstantItem === 'slow') duration *= 2;
+            
             const startTime = Date.now();
             const startY = -1;
             
@@ -342,7 +1089,6 @@
                 if (!gameRunning || mole.userData.hit) return;
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-                // Elastic ease out
                 const eased = 1 - Math.pow(1 - progress, 3) * Math.cos(progress * Math.PI * 0.5);
                 mole.position.y = startY + (targetY - startY) * eased;
                 if (progress < 1) {
@@ -383,18 +1129,22 @@
         function whackMole(moleData) {
             if (moleData.hit) return;
             moleData.hit = true;
-            score += 10;
-            document.getElementById('score-display').textContent = score;
             
-            // Show hit effect at mole position
-            const pos = moleData.mesh.position.clone();
-            pos.y = 1;
-            const screenPos = pos.project(camera);
-            const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-            const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
-            showHitEffect(x, y);
+            // Super hammer always hits
+            if (selectedInstantItem === 'super' && instantItemUsed.super < 5) {
+                instantItemUsed.super++;
+            }
             
-            // Play whack animation
+            combo++;
+            let points = 100 + (combo - 1) * 10;
+            if (selectedInstantItem === 'double') points *= 2;
+            score += points;
+            
+            updateScoreDisplay();
+            showHitEffect(moleData);
+            
+            playWhackSound();
+            
             const mole = moleData.mesh;
             const duration = 200;
             const startTime = Date.now();
@@ -413,8 +1163,22 @@
             animateWhack();
         }
 
-        // Hit effect visual
-        function showHitEffect(x, y) {
+        // Miss
+        function miss() {
+            combo = 0;
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('score-display').textContent = score;
+        }
+
+        function showHitEffect(moleData) {
+            const pos = moleData.mesh.position.clone();
+            pos.y = 1;
+            const screenPos = pos.project(camera);
+            const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+            
             const effect = document.createElement('div');
             effect.className = 'hit-effect';
             effect.style.left = x + 'px';
@@ -423,7 +1187,7 @@
             setTimeout(() => effect.remove(), 400);
         }
 
-        // Raycaster for mouse picking
+        // Raycaster
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
@@ -437,11 +1201,12 @@
         }
 
         function onClick(event) {
-            if (!gameRunning) return;
+            if (!gameRunning || currentScreen !== 'playing') return;
             
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
             
+            let hit = false;
             for (const intersect of intersects) {
                 let obj = intersect.object;
                 while (obj.parent && !obj.userData.isMole) {
@@ -451,10 +1216,31 @@
                     const moleData = moles.find(m => m.mesh === obj);
                     if (moleData && !moleData.hit && moleData.state !== 'hiding') {
                         whackMole(moleData);
+                        hit = true;
                         break;
                     }
                 }
             }
+            
+            if (!hit && selectedInstantItem === 'super' && instantItemUsed.super < 5) {
+                // Super hammer always hits nearest mole
+                let nearest = null, nearestDist = Infinity;
+                moles.forEach(m => {
+                    if (!m.hit) {
+                        let d = m.mesh.position.distanceTo(new THREE.Vector3(mouse.x, mouse.y, 0));
+                        if (d < nearestDist) {
+                            nearestDist = d;
+                            nearest = m;
+                        }
+                    }
+                });
+                if (nearest) {
+                    whackMole(nearest);
+                    hit = true;
+                }
+            }
+            
+            if (!hit) miss();
         }
 
         window.addEventListener('mousemove', onMouseMove);
@@ -466,7 +1252,6 @@
 
         function spawnLoop(time) {
             if (gameRunning && time - lastSpawnTime > spawnInterval) {
-                // Find available holes
                 const available = holes.map((h, i) => i).filter(i => !holes[i].occupied);
                 if (available.length > 0) {
                     const holeIndex = available[Math.floor(Math.random() * available.length)];
@@ -478,13 +1263,13 @@
         }
         requestAnimationFrame(spawnLoop);
 
-        // Mole timeout handler
+        // Mole timeout
         setInterval(() => {
             if (!gameRunning) return;
             moles.forEach(moleData => {
                 if (moleData.hit) return;
                 moleData.timer++;
-                if (moleData.timer > 60) { // About 1 second
+                if (moleData.timer > 60) {
                     moleData.state = 'hiding';
                     hideMole(moleData);
                 }
@@ -494,63 +1279,212 @@
         // Render loop
         function animate() {
             requestAnimationFrame(animate);
-            renderer.render(scene, camera);
+            
+            if (currentScreen === 'playing') {
+                renderer.render(scene, camera);
+            }
         }
         animate();
 
         // Game functions
-        function startGame() {
+        function startClassicGame() {
             score = 0;
+            combo = 0;
             timeLeft = 30;
             gameRunning = true;
+            currentWorld = 0;
+            selectedInstantItem = null;
+            instantItemUsed = { slow: false, double: false, super: 0 };
+            
+            createGround(WORLD_THEMES[0]);
+            createGrassPatches(WORLD_THEMES[0]);
+            
+            document.getElementById('info').style.display = 'flex';
             document.getElementById('score-display').textContent = '0';
             document.getElementById('time-display').textContent = '30';
-            document.getElementById('start-screen').style.display = 'none';
-            document.getElementById('game-over-screen').style.display = 'none';
             document.getElementById('crosshair').style.display = 'block';
             
-            // Clear any existing moles
-            moles.forEach(m => {
-                if (m.mesh.parent) scene.remove(m.mesh);
-            });
-            moles = [];
-            holes.forEach(h => { h.occupied = false; h.mole = null; });
+            clearMoles();
             
             gameTimer = setInterval(() => {
                 timeLeft--;
                 document.getElementById('time-display').textContent = timeLeft;
                 if (timeLeft <= 0) {
-                    endGame();
+                    endClassicGame();
                 }
             }, 1000);
         }
 
-        function endGame() {
+        function startLevelGame(world, level) {
+            score = 0;
+            combo = 0;
+            timeLeft = 45;
+            gameRunning = true;
+            currentWorld = world;
+            currentLevel = level;
+            instantItemUsed = { slow: false, double: false, super: 0 };
+            
+            createGround(WORLD_THEMES[world]);
+            createGrassPatches(WORLD_THEMES[world]);
+            
+            document.getElementById('info').style.display = 'flex';
+            document.getElementById('score-display').textContent = '0';
+            document.getElementById('time-display').textContent = '45';
+            document.getElementById('crosshair').style.display = 'block';
+            
+            clearMoles();
+            
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('time-display').textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    endLevelGame();
+                }
+            }, 1000);
+        }
+
+        function clearMoles() {
+            moles.forEach(m => {
+                if (m.mesh.parent) scene.remove(m.mesh);
+            });
+            moles = [];
+            holes.forEach(h => { h.occupied = false; h.mole = null; });
+        }
+
+        function endClassicGame() {
             gameRunning = false;
             clearInterval(gameTimer);
             document.getElementById('crosshair').style.display = 'none';
-            document.getElementById('final-score').textContent = score;
-            document.getElementById('game-over-screen').style.display = 'flex';
             
-            // Hide all moles
-            moles.forEach(m => {
-                if (!m.hit) hideMole(m);
-            });
+            let coins = Math.floor(score / 10);
+            gameData.coins += coins;
+            saveGame();
+            
+            lastGameResult = {
+                title: '时间到！',
+                score: score,
+                coins: coins,
+                mode: 'classic'
+            };
+            currentScreen = 'gameover';
         }
 
-        // Event listeners
-        document.getElementById('start-btn').addEventListener('click', startGame);
-        document.getElementById('restart-btn').addEventListener('click', startGame);
+        function endLevelGame() {
+            gameRunning = false;
+            clearInterval(gameTimer);
+            document.getElementById('crosshair').style.display = 'none';
+            
+            let stars = 0;
+            if (score >= STAR_THRESHOLDS[0]) stars = 1;
+            if (score >= STAR_THRESHOLDS[1]) stars = 2;
+            if (score >= STAR_THRESHOLDS[2]) stars = 3;
+            
+            // Save best stars
+            if (stars > gameData.levels[currentWorld][currentLevel]) {
+                gameData.levels[currentWorld][currentLevel] = stars;
+            }
+            
+            // Check world unlock
+            if (currentWorld === 0 && isWorldComplete(0) && !gameData.unlockedWorlds[1]) {
+                gameData.unlockedWorlds[1] = true;
+            }
+            if (currentWorld === 1 && isWorldComplete(1) && !gameData.unlockedWorlds[2]) {
+                gameData.unlockedWorlds[2] = true;
+            }
+            
+            let coins = Math.floor(score / 10);
+            gameData.coins += coins;
+            saveGame();
+            
+            lastGameResult = {
+                title: stars >= 1 ? '🎉 过关！' : '😢 未过关',
+                score: score,
+                stars: stars,
+                coins: coins,
+                mode: 'level',
+                world: currentWorld,
+                level: currentLevel
+            };
+            currentScreen = 'gameover';
+        }
+
+        // Audio
+        let audioCtx;
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playWhackSound() {
+            if (!audioCtx) initAudio();
+            if (!gameData.settings.sound) return;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
 
         // Window resize
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            resizeUI();
         });
 
         // Hide cursor initially
         document.body.style.cursor = 'none';
+
+        // ==================== INFO BAR ====================
+        const infoDiv = document.createElement('div');
+        infoDiv.id = 'info';
+        infoDiv.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);color:#ffd700;font-size:28px;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.5);z-index:100;display:none;gap:40px;';
+        infoDiv.innerHTML = '<span>得分: <b id="score-display">0</b></span><span>时间: <b id="time-display">30</b>s</span>';
+        document.body.appendChild(infoDiv);
+
+        // ==================== UI RENDER LOOP ====================
+        let hoveredBtn = -1;
+        
+        function renderUI() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (currentScreen === 'menu') drawMenuScreen();
+            else if (currentScreen === 'modeSelect') drawModeSelectScreen();
+            else if (currentScreen === 'instantItemSelect') drawInstantItemSelectScreen();
+            else if (currentScreen === 'levelSelect') drawLevelSelectScreen();
+            else if (currentScreen === 'shop') drawShopScreen();
+            else if (currentScreen === 'collection') drawCollectionScreen();
+            else if (currentScreen === 'gameover') drawGameOverScreen();
+            
+            requestAnimationFrame(renderUI);
+        }
+        renderUI();
+
+        // Mouse events for UI
+        canvas.addEventListener('mousemove', (e) => {
+            hoveredBtn = -1;
+            uiButtons.forEach((btn, i) => {
+                if (isPointInButton(e.clientX, e.clientY, btn)) hoveredBtn = i;
+            });
+            canvas.style.pointerEvents = hoveredBtn >= 0 ? 'auto' : 'none';
+            document.body.style.cursor = hoveredBtn >= 0 ? 'pointer' : 'none';
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (hoveredBtn >= 0 && uiButtons[hoveredBtn]) {
+                uiButtons[hoveredBtn].action();
+                hoveredBtn = -1;
+            }
+        });
+
+        // Initialize
+        document.getElementById('info').style.display = 'none';
     </script>
 </body>
 </html>
