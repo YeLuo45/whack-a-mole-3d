@@ -693,17 +693,8 @@
         <button class="btn" id="back-from-achievements">返回</button>
     </div>
 
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-        }
-    }
-    </script>
-
-    <script type="module">
-        import * as THREE from 'three';
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
         // ============ GAME CONSTANTS ============
         const WORLDS = ['森林', '矿山', '冰原', '熔岩'];
         const LEVELS_PER_WORLD = 10;
