@@ -415,6 +415,144 @@
             50% { transform: scale(3); opacity: 0.8; }
             100% { transform: scale(5); opacity: 0; }
         }
+
+        /* Achievement Notification */
+        #achievement-notification {
+            position: fixed;
+            top: 100px;
+            right: -400px;
+            width: 350px;
+            background: linear-gradient(135deg, rgba(139,105,20,0.95), rgba(107,78,10,0.95));
+            border-radius: 15px;
+            border: 3px solid #ffd700;
+            padding: 20px;
+            z-index: 500;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            transition: right 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        #achievement-notification.show {
+            right: 20px;
+        }
+        #achievement-notification .icon {
+            font-size: 48px;
+            flex-shrink: 0;
+        }
+        #achievement-notification .content {
+            flex: 1;
+        }
+        #achievement-notification .title {
+            color: #ffd700;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        #achievement-notification .name {
+            color: #fff;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        #achievement-notification .reward {
+            color: #ffd700;
+            font-size: 16px;
+        }
+        #achievement-notification .progress {
+            color: #ccc;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        /* Achievement Screen */
+        #achievement-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(20,15,10,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            z-index: 300;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        #achievement-screen h2 { 
+            color: #ffd700; 
+            font-size: 42px; 
+            margin: 20px 0 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #achievement-progress {
+            color: #8b6914;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+        #achievement-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            max-width: 1200px;
+            width: 100%;
+            padding: 10px;
+        }
+        .achievement-card {
+            background: linear-gradient(135deg, rgba(60,50,30,0.9), rgba(40,30,15,0.9));
+            border-radius: 12px;
+            border: 2px solid #5a4a2a;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .achievement-card.unlocked {
+            border-color: #ffd700;
+            background: linear-gradient(135deg, rgba(80,65,30,0.95), rgba(60,50,20,0.95));
+        }
+        .achievement-card.unlocked .achievement-icon {
+            filter: none;
+        }
+        .achievement-card:not(.unlocked) {
+            opacity: 0.6;
+        }
+        .achievement-card:not(.unlocked) .achievement-icon {
+            filter: grayscale(100%);
+        }
+        .achievement-card:hover {
+            transform: scale(1.02);
+        }
+        .achievement-icon {
+            font-size: 40px;
+            flex-shrink: 0;
+        }
+        .achievement-info {
+            flex: 1;
+        }
+        .achievement-name {
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .achievement-desc {
+            color: #aaa;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+        .achievement-reward {
+            color: #ffd700;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .achievement-unlock-time {
+            color: #8b6914;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        #back-from-achievements {
+            margin: 20px 0 30px;
+        }
     </style>
 </head>
 <body>
@@ -458,6 +596,9 @@
         <div id="high-score-badge">最高分: <span id="high-score-val">0</span></div>
         <button class="btn" id="start-btn">开始游戏</button>
         <button class="btn btn-secondary btn-small" id="world-btn">选择关卡</button>
+        <div style="margin-top: 15px;">
+            <button class="btn btn-small" id="sound-toggle-btn" style="background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);">🔊 音效开</button>
+        </div>
         <p class="instructions">普通地鼠 +10分 | 金色地鼠 +50分 | 炸弹 -20分<br>快速连击获得分数加成！</p>
     </div>
 
@@ -511,6 +652,47 @@
         <button class="btn btn-small" id="boss-to-world-btn">返回选关</button>
     </div>
 
+    <!-- Endless Mode Overlay -->
+    <div id="endless-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:350;">
+        <h2 style="color:#ffd700;font-size:48px;margin-bottom:20px;">🏆 无尽模式 🏆</h2>
+        <div id="endless-final-score" style="color:#8b6914;font-size:72px;font-weight:bold;margin:10px 0;">0</div>
+        <div id="endless-highscore-list" style="color:#fff;font-size:20px;margin:15px 0;text-align:center;line-height:1.8;"></div>
+        <div id="endless-new-record" style="background:linear-gradient(180deg,#ffd700,#ff8c00);color:#8b6914;padding:10px 25px;border-radius:25px;font-size:20px;font-weight:bold;margin:10px 0;display:none;">🎉 新纪录！ 🎉</div>
+        <div style="display:flex;gap:15px;margin-top:15px;">
+            <button class="btn" id="endless-restart-btn">再来一局</button>
+            <button class="btn btn-small" id="endless-home-btn">返回主页</button>
+        </div>
+    </div>
+
+    <!-- Endless Leaderboard Panel -->
+    <div id="endless-leaderboard" style="position:fixed;top:80px;right:20px;background:rgba(0,0,0,0.7);border-radius:15px;padding:15px;z-index:100;display:none;min-width:180px;">
+        <div style="color:#ffd700;font-size:16px;font-weight:bold;margin-bottom:10px;text-align:center;">🏆 Top5 排行榜</div>
+        <div id="endless-rank-list" style="color:#fff;font-size:14px;line-height:1.8;"></div>
+    </div>
+
+    <!-- Endless Difficulty Bar -->
+    <div id="endless-difficulty-bar" style="position:fixed;top:20px;right:20px;width:150px;height:14px;background:rgba(0,0,0,0.5);border-radius:7px;border:2px solid rgba(139,105,20,0.5);overflow:hidden;z-index:100;display:none;">
+        <div id="endless-difficulty-fill" style="height:100%;background:linear-gradient(90deg,#4CAF50,#ffd700,#ff4500);width:10%;transition:width 0.3s;border-radius:5px;"></div>
+    </div>
+    <div id="endless-level-label" style="position:fixed;top:38px;right:20px;color:#ffd700;font-size:12px;font-weight:bold;z-index:100;display:none;">难度: <span id="endless-level-val">1</span></div>
+
+    <div id="achievement-notification">
+        <div class="icon">🏆</div>
+        <div class="content">
+            <div class="title">成就解锁</div>
+            <div class="name" id="achievement-notif-name"></div>
+            <div class="reward" id="achievement-notif-reward"></div>
+            <div class="progress" id="achievement-notif-progress"></div>
+        </div>
+    </div>
+
+    <div id="achievement-screen">
+        <h2>🏆 成就</h2>
+        <div id="achievement-progress">已解锁: <span id="achievement-unlocked-count">0</span>/16</div>
+        <div id="achievement-list"></div>
+        <button class="btn" id="back-from-achievements">返回</button>
+    </div>
+
     <script type="importmap">
     {
         "imports": {
@@ -560,12 +742,34 @@
 
         // ============ AUDIO SYSTEM ============
         let audioCtx = null;
+        let soundEnabled = true;
+        
+        function loadSoundSetting() {
+            try {
+                const data = localStorage.getItem('whackSaveData');
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    soundEnabled = parsed.soundEnabled !== false;
+                }
+            } catch(e) {}
+        }
+        
+        function saveSoundSetting() {
+            try {
+                const data = localStorage.getItem('whackSaveData');
+                const parsed = data ? JSON.parse(data) : {};
+                parsed.soundEnabled = soundEnabled;
+                localStorage.setItem('whackSaveData', JSON.stringify(parsed));
+            } catch(e) {}
+        }
+        
         function getAudioCtx() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             return audioCtx;
         }
-
+        
         function playWhackSound() {
+            if (!soundEnabled) return;
             try {
                 const ctx = getAudioCtx();
                 const osc = ctx.createOscillator();
@@ -580,6 +784,7 @@
         }
 
         function playBombSound() {
+            if (!soundEnabled) return;
             try {
                 const ctx = getAudioCtx();
                 const osc = ctx.createOscillator();
@@ -595,6 +800,7 @@
         }
 
         function playGoldenSound() {
+            if (!soundEnabled) return;
             try {
                 const ctx = getAudioCtx();
                 [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((freq, i) => {
@@ -613,6 +819,7 @@
         }
 
         function playPowerupSound() {
+            if (!soundEnabled) return;
             try {
                 const ctx = getAudioCtx();
                 [400, 500, 600, 800].forEach((freq, i) => {
@@ -630,6 +837,7 @@
         }
 
         function playComboBreakSound() {
+            if (!soundEnabled) return;
             try {
                 const ctx = getAudioCtx();
                 const osc = ctx.createOscillator();
@@ -645,6 +853,7 @@
         }
 
         function playPauseSound() {
+            if (!soundEnabled) return;
             try {
                 const ctx = getAudioCtx();
                 const osc = ctx.createOscillator();
@@ -656,6 +865,137 @@
                 gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
                 osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.2);
             } catch(e) {}
+        }
+        
+        // UI Sounds (PRD 2.2)
+        function playClickSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.02);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.02);
+            } catch(e) {}
+        }
+        
+        function playPurchaseSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(500, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.1);
+            } catch(e) {}
+        }
+        
+        function playErrorSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.1);
+            } catch(e) {}
+        }
+        
+        function playCountdownSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1000, ctx.currentTime);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.1);
+            } catch(e) {}
+        }
+        
+        function playGameOverSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(500, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5);
+            } catch(e) {}
+        }
+        
+        function playLevelUpSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    const t = ctx.currentTime + i * 0.12;
+                    gain.gain.setValueAtTime(0.3, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                    osc.start(t); osc.stop(t + 0.3);
+                });
+            } catch(e) {}
+        }
+        
+        function playBossSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(80, ctx.currentTime);
+                gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 1);
+            } catch(e) {}
+        }
+        
+        // Vibration feedback (PRD 3)
+        function vibrate(duration) {
+            if (!soundEnabled) return;
+            try {
+                if (navigator.vibrate) {
+                    navigator.vibrate(duration);
+                }
+            } catch(e) {}
+        }
+        
+        function triggerHitVibration(comboCount) {
+            vibrate(10);
+            if (comboCount >= 5) {
+                vibrate(50);
+            } else if (comboCount >= 3) {
+                vibrate(20);
+            }
         }
 
         function playBossHitSound() {
@@ -748,7 +1088,17 @@
                 levels: [[0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0]],
                 bossHP: 10,
                 bossMaxHP: 10,
-                highScore: 0
+                highScore: 0,
+                achievements: {},
+                coins: 0,
+                totalHits: 0,
+                maxCombo: 0,
+                maxScore: 0,
+                perfectRounds: 0,
+                endlessHighScores: [],
+                moleSkins: 0,
+                hammerSkins: 0,
+                loginStreak: 0
             };
         }
 
@@ -782,6 +1132,156 @@
             return data.bossHP <= 0;
         }
 
+        // ============ ACHIEVEMENT SYSTEM ============
+        const ACHIEVEMENTS = [
+            // 新手成就
+            { id: 'first_level', name: '初出茅庐', desc: '完成第1关', icon: '🎯', reward: 50, condition: (s) => s.levelsCompleted >= 1 },
+            { id: 'first_hit', name: '第一锤', desc: '击中第1只地鼠', icon: '🔨', reward: 10, condition: (s) => s.totalHits >= 1 },
+            // 进阶成就
+            { id: 'combo_5', name: '连击达人', desc: '单局达成5连击', icon: '🔥', reward: 30, condition: (s) => s.maxCombo >= 5 },
+            { id: 'combo_10', name: '超级连击', desc: '单局达成10连击', icon: '⚡', reward: 100, condition: (s) => s.maxCombo >= 10 },
+            { id: 'score_500', name: '火力全开', desc: '单局分数超过500', icon: '💥', reward: 50, condition: (s) => s.maxScore >= 500 },
+            { id: 'perfect', name: '精准打击', desc: '单局命中率100%', icon: '🎯', reward: 200, condition: (s) => s.perfectRounds >= 1 },
+            // 收集成就
+            { id: 'mole_collector', name: '收藏家', desc: '拥有3个地鼠皮肤', icon: '🐹', reward: 100, condition: (s) => s.moleSkins >= 3 },
+            { id: 'hammer_collector', name: '锤子收藏家', desc: '拥有2个锤子皮肤', icon: '🔨', reward: 100, condition: (s) => s.hammerSkins >= 2 },
+            { id: 'streak_7', name: '签到一周', desc: '连续签到7天', icon: '📅', reward: 150, condition: (s) => s.loginStreak >= 7 },
+            // 模式成就
+            { id: 'endless_1000', name: '无尽探索', desc: '无尽模式分数超过1000', icon: '♾️', reward: 200, condition: (s) => (s.endlessHighScores && s.endlessHighScores[0] >= 1000) },
+            { id: 'endless_3000', name: '无尽狂热', desc: '无尽模式分数超过3000', icon: '🌟', reward: 500, condition: (s) => (s.endlessHighScores && s.endlessHighScores[0] >= 3000) },
+            { id: 'boss_killer', name: 'Boss克星', desc: '击败火焰巨人Boss', icon: '👹', reward: 300, condition: (s) => s.bossDefeated },
+            { id: 'world_conqueror', name: '世界征服', desc: '通关所有40关', icon: '🏰', reward: 500, condition: (s) => s.levelsCompleted >= 40 },
+        ];
+
+        // Achievement state helpers
+        function getAchievementData() {
+            const data = getSaveData();
+            if (!data.achievements) {
+                data.achievements = {};
+                saveSaveData(data);
+            }
+            return data;
+        }
+
+        function isAchievementUnlocked(id) {
+            const data = getAchievementData();
+            return data.achievements[id]?.unlocked || false;
+        }
+
+        function unlockAchievement(id) {
+            const data = getAchievementData();
+            if (data.achievements[id]?.unlocked) return false;
+            
+            const achievement = ACHIEVEMENTS.find(a => a.id === id);
+            if (!achievement) return false;
+            
+            data.achievements[id] = { unlocked: true, unlockedAt: Date.now() };
+            data.coins = (data.coins || 0) + achievement.reward;
+            saveSaveData(data);
+            
+            showAchievementNotification(achievement);
+            return true;
+        }
+
+        function showAchievementNotification(achievement) {
+            const notif = document.getElementById('achievement-notification');
+            document.getElementById('achievement-notif-name').textContent = achievement.name;
+            document.getElementById('achievement-notif-reward').textContent = `+${achievement.reward} 金币`;
+            document.getElementById('achievement-notif-progress').textContent = achievement.desc;
+            notif.classList.add('show');
+            
+            setTimeout(() => {
+                notif.classList.remove('show');
+            }, 3000);
+        }
+
+        function getAchievementStats() {
+            const data = getAchievementData();
+            const completedLevels = countCompletedLevels();
+            const bossDefeated = data.bossHP !== undefined && data.bossHP <= 0;
+            const endlessScores = data.endlessHighScores || [];
+            const endlessHighScore = endlessScores.length > 0 ? Math.max(...endlessScores) : 0;
+            return {
+                levelsCompleted: completedLevels + (bossDefeated ? 1 : 0),
+                totalHits: data.totalHits || 0,
+                maxCombo: data.maxCombo || 0,
+                maxScore: data.maxScore || 0,
+                perfectRounds: data.perfectRounds || 0,
+                moleSkins: data.moleSkins || 0,
+                hammerSkins: data.hammerSkins || 0,
+                loginStreak: data.loginStreak || 0,
+                endlessHighScore: endlessHighScore,
+                bossDefeated: bossDefeated
+            };
+        }
+
+        function countCompletedLevels() {
+            const data = getAchievementData();
+            let count = 0;
+            for (let w = 0; w < 4; w++) {
+                if (data.levels[w]) {
+                    count += data.levels[w].filter(s => s > 0).length;
+                }
+            }
+            return count;
+        }
+
+        function checkAchievements() {
+            const stats = getAchievementStats();
+            for (const ach of ACHIEVEMENTS) {
+                if (!isAchievementUnlocked(ach.id) && ach.condition(stats)) {
+                    unlockAchievement(ach.id);
+                }
+            }
+        }
+
+        function showAchievementScreen() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('achievement-screen').style.display = 'flex';
+            renderAchievementList();
+        }
+
+        function renderAchievementList() {
+            const list = document.getElementById('achievement-list');
+            const data = getAchievementData();
+            let unlockedCount = 0;
+            
+            list.innerHTML = '';
+            
+            for (const ach of ACHIEVEMENTS) {
+                const unlocked = isAchievementUnlocked(ach.id);
+                if (unlocked) unlockedCount++;
+                
+                const card = document.createElement('div');
+                card.className = `achievement-card ${unlocked ? 'unlocked' : ''}`;
+                
+                let unlockTime = '';
+                if (unlocked && data.achievements[ach.id]?.unlockedAt) {
+                    const d = new Date(data.achievements[ach.id].unlockedAt);
+                    unlockTime = `解锁于: ${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+                }
+                
+                card.innerHTML = `
+                    <div class="achievement-icon">${ach.icon}</div>
+                    <div class="achievement-info">
+                        <div class="achievement-name">${ach.name}</div>
+                        <div class="achievement-desc">${ach.desc}</div>
+                        <div class="achievement-reward">🏅 +${ach.reward} 金币</div>
+                        ${unlockTime ? `<div class="achievement-unlock-time">${unlockTime}</div>` : ''}
+                    </div>
+                `;
+                list.appendChild(card);
+            }
+            
+            document.getElementById('achievement-unlocked-count').textContent = unlockedCount;
+        }
+
+        document.getElementById('achievement-btn').addEventListener('click', showAchievementScreen);
+        document.getElementById('back-from-achievements').addEventListener('click', () => {
+            document.getElementById('achievement-screen').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+        });
+
         // ============ GAME STATE ============
         let score = 0;
         let timeLeft = 30;
@@ -794,7 +1294,7 @@
         // Level/World system
         let currentWorld = 0;
         let currentLevel = 0;
-        let levelMode = 'normal'; // 'normal' or 'boss'
+        let levelMode = 'normal'; // 'normal' or 'boss' or 'endless'
 
         // Boss state
         let bossHP = 10;
@@ -825,6 +1325,189 @@
         let doubleScoreTimer = null;
         let freezeTimer = null;
         let shieldTimer = null;
+
+        // ============ ENDLESS MODE ============
+        let endlessMode = false;
+        let endlessTimeLeft = 60;
+        let endlessSpawnInterval = 1200;
+        let endlessMoleDuration = 60;
+        let endlessDifficultyLevel = 1;
+        let endlessDoubleMoleChance = 0;
+        let endlessSpawnTimer = null;
+        let endlessDifficultyTimer = null;
+        let endlessStartTime = 0;
+
+        // Endless leaderboard functions
+        function getEndlessHighScores() {
+            const data = getSaveData();
+            return data.endlessHighScores || [];
+        }
+
+        function saveEndlessScore(score) {
+            const data = getSaveData();
+            if (!data.endlessHighScores) data.endlessHighScores = [];
+            data.endlessHighScores.push(score);
+            data.endlessHighScores.sort((a, b) => b - a);
+            data.endlessHighScores = data.endlessHighScores.slice(0, 5);
+            saveSaveData(data);
+        }
+
+        function isEndlessNewRecord(score) {
+            const scores = getEndlessHighScores();
+            if (scores.length < 5) return true;
+            return score > scores[scores.length - 1];
+        }
+
+        function updateEndlessLeaderboard() {
+            const scores = getEndlessHighScores();
+            const list = document.getElementById('endless-rank-list');
+            if (scores.length === 0) {
+                list.innerHTML = '<div style="color:#888;">暂无记录</div>';
+            } else {
+                list.innerHTML = scores.map((s, i) =>
+                    `<div style="${i === 0 ? 'color:#ffd700;' : ''}">${i + 1}. ${s}分</div>`
+                ).join('');
+            }
+        }
+
+        function startEndlessMode() {
+            endlessMode = true;
+            levelMode = 'endless';
+            currentWorld = 0;
+            
+            setWorldTheme(0);
+            
+            endlessTimeLeft = 60;
+            endlessSpawnInterval = 1200;
+            endlessMoleDuration = 60;
+            endlessDifficultyLevel = 1;
+            endlessDoubleMoleChance = 0;
+            endlessStartTime = Date.now();
+            
+            startGame(60);
+            
+            document.getElementById('level-display').textContent = '无尽';
+            document.getElementById('world-select-screen').style.display = 'none';
+            document.getElementById('endless-overlay').style.display = 'none';
+            
+            // Show endless UI elements
+            document.getElementById('endless-difficulty-bar').style.display = 'block';
+            document.getElementById('endless-level-label').style.display = 'block';
+            document.getElementById('endless-leaderboard').style.display = 'block';
+            updateEndlessLeaderboard();
+            
+            // Start endless difficulty progression
+            if (endlessDifficultyTimer) clearInterval(endlessDifficultyTimer);
+            endlessDifficultyTimer = setInterval(() => {
+                if (!gameRunning || gamePaused || !endlessMode) return;
+                updateEndlessDifficulty();
+            }, 1000);
+        }
+
+        function updateEndlessDifficulty() {
+            // Every 10s: spawn interval -10% (min 500ms)
+            // Every 15s: mole duration -5% (min 800ms)  
+            // Every 20s: double mole chance +10% (max 50%)
+            
+            const elapsed = Math.floor((Date.now() - endlessStartTime) / 1000);
+            
+            // Difficulty level calculation (1-10)
+            const newLevel = Math.min(10, 1 + Math.floor(elapsed / 10));
+            if (newLevel !== endlessDifficultyLevel) {
+                endlessDifficultyLevel = newLevel;
+                document.getElementById('endless-level-val').textContent = newLevel;
+                document.getElementById('endless-difficulty-fill').style.width = (newLevel * 10) + '%';
+                playLevelUpSound();
+            }
+            
+            // Spawn interval: every 10s
+            const spawnReduction = Math.floor(elapsed / 10) * 0.1;
+            endlessSpawnInterval = Math.max(500, Math.floor(1200 * (1 - spawnReduction)));
+            
+            // Mole duration: every 15s
+            const durationReduction = Math.floor(elapsed / 15) * 0.05;
+            endlessMoleDuration = Math.max(30, Math.floor(60 * (1 - durationReduction)));
+            
+            // Double mole chance: every 20s
+            const doubleIncrease = Math.floor(elapsed / 20) * 0.1;
+            endlessDoubleMoleChance = Math.min(0.5, doubleIncrease);
+        }
+
+        function endEndlessMode() {
+            endlessMode = false;
+            if (endlessDifficultyTimer) {
+                clearInterval(endlessDifficultyTimer);
+                endlessDifficultyTimer = null;
+            }
+            
+            gameRunning = false;
+            clearInterval(gameTimer);
+            
+            const finalScore = score;
+            const isNew = isEndlessNewRecord(finalScore);
+            
+            if (isNew) {
+                saveEndlessScore(finalScore);
+            }
+            
+            // Check achievements after endless game ends
+            checkAchievements();
+            
+            // Update overlay
+            document.getElementById('endless-final-score').textContent = finalScore;
+            document.getElementById('endless-new-record').style.display = isNew ? 'block' : 'none';
+            
+            // Show top5
+            const scores = getEndlessHighScores();
+            const listEl = document.getElementById('endless-highscore-list');
+            if (scores.length === 0) {
+                listEl.innerHTML = '<div style="color:#888;">暂无排行榜记录</div>';
+            } else {
+                listEl.innerHTML = '<div style="margin-bottom:10px;">🏆 历史最高 🏆</div>' +
+                    scores.map((s, i) => `<div style="${i === 0 && s === finalScore ? 'color:#ffd700;' : 'color:#aaa;'}">${i + 1}. ${s}分</div>`).join('');
+            }
+            
+            // Hide endless UI
+            document.getElementById('endless-difficulty-bar').style.display = 'none';
+            document.getElementById('endless-level-label').style.display = 'none';
+            document.getElementById('endless-leaderboard').style.display = 'none';
+            document.getElementById('crosshair').style.display = 'none';
+            document.getElementById('pause-btn').style.display = 'none';
+            document.getElementById('combo-bar-container').style.display = 'none';
+            
+            document.getElementById('endless-overlay').style.display = 'flex';
+        }
+
+        // Endless mode spawn logic
+        function endlessSpawnLoop(time) {
+            if (gameRunning && !gamePaused && endlessMode) {
+                const effectiveInterval = freezeActive ? endlessSpawnInterval * 2 : endlessSpawnInterval;
+                if (time - lastSpawnTime > effectiveInterval) {
+                    const available = holes.map((h, i) => i).filter(i => !holes[i].occupied);
+                    
+                    // Check if we should spawn double moles
+                    if (endlessDoubleMoleChance > 0 && Math.random() < endlessDoubleMoleChance && available.length >= 2) {
+                        const shuffled = available.sort(() => Math.random() - 0.5);
+                        const type = Math.random() < 0.08 ? 'golden' : 'normal';
+                        showMole(shuffled[0], type);
+                        showMole(shuffled[1], type);
+                    } else if (available.length > 0) {
+                        const holeIndex = available[Math.floor(Math.random() * available.length)];
+                        const rand = Math.random();
+                        if (rand < 0.08) {
+                            showMole(holeIndex, 'golden');
+                        } else if (rand < 0.16) {
+                            showMole(holeIndex, 'bomb');
+                        } else {
+                            showMole(holeIndex, 'normal');
+                        }
+                    }
+                    lastSpawnTime = time;
+                }
+            }
+            requestAnimationFrame(endlessSpawnLoop);
+        }
+        requestAnimationFrame(endlessSpawnLoop);
 
         // ============ THREE.JS SETUP ============
         const scene3 = new THREE.Scene();
@@ -1316,6 +1999,9 @@
             data.bossHP = 0;
             saveSaveData(data);
 
+            // Check boss defeat achievement
+            checkAchievements();
+
             playLevelUpSound();
         }
 
@@ -1663,10 +2349,26 @@
             if (combo > bestCombo) bestCombo = combo;
         }
 
+        function showEndlessComboBonus(x, y, mult) {
+            if (endlessMode && mult > 1) {
+                const bonusText = mult === 2 ? '+100% combo!' : '+50% combo!';
+                setTimeout(() => {
+                    showScorePopup(x, y - 30, bonusText, '#ffd700');
+                }, 100);
+            }
+        }
+
         function getComboMultiplier() {
             if (combo >= 20) return 3;
             if (combo >= 10) return 2;
             if (combo >= 5) return 1.5;
+            return 1;
+        }
+
+        function getEndlessComboMultiplier() {
+            // Endless mode: 3 hits = +50%, 5 hits = +100%
+            if (combo >= 5) return 2;
+            if (combo >= 3) return 1.5;
             return 1;
         }
 
@@ -1704,6 +2406,17 @@
             if (moleData.hit) return;
             moleData.hit = true;
             totalHits++;
+
+            // Update persistent stats for achievements
+            const data = getSaveData();
+            data.totalHits = (data.totalHits || 0) + 1;
+            if (combo + 1 > (data.maxCombo || 0)) {
+                data.maxCombo = combo + 1;
+            }
+            saveSaveData(data);
+
+            // Check hit-based achievements
+            checkAchievements();
 
             const pos = moleData.mesh.position.clone();
             pos.y = 1;
@@ -1750,7 +2463,7 @@
                 lastHitTime = Date.now();
                 comboTimer = 0;
                 let pts = 50;
-                pts = Math.floor(pts * getComboMultiplier());
+                pts = Math.floor(pts * (endlessMode ? getEndlessComboMultiplier() : getComboMultiplier()));
                 if (doubleScoreActive) pts *= 2;
                 score += pts;
                 document.getElementById('score-display').textContent = score;
@@ -1766,7 +2479,7 @@
                 lastHitTime = Date.now();
                 comboTimer = 0;
                 let pts = 10;
-                pts = Math.floor(pts * getComboMultiplier());
+                pts = Math.floor(pts * (endlessMode ? getEndlessComboMultiplier() : getComboMultiplier()));
                 if (doubleScoreActive) pts *= 2;
                 score += pts;
                 document.getElementById('score-display').textContent = score;
@@ -1780,7 +2493,7 @@
                 lastHitTime = Date.now();
                 comboTimer = 0;
                 let pts = 10;
-                pts = Math.floor(pts * getComboMultiplier());
+                pts = Math.floor(pts * (endlessMode ? getEndlessComboMultiplier() : getComboMultiplier()));
                 if (doubleScoreActive) pts *= 2;
                 score += pts;
                 document.getElementById('score-display').textContent = score;
@@ -1791,6 +2504,8 @@
             }
 
             updateComboDisplay();
+            showEndlessComboBonus(x, y, endlessMode ? getEndlessComboMultiplier() : 1);
+            triggerHitVibration(combo);
 
             if (score >= 10 && score > lastMilestone) {
                 lastMilestone = score;
@@ -1936,11 +2651,20 @@
         function goToStart() {
             gamePaused = false;
             gameRunning = false;
+            endlessMode = false;
             bossActive = false;
+            if (endlessDifficultyTimer) {
+                clearInterval(endlessDifficultyTimer);
+                endlessDifficultyTimer = null;
+            }
             document.getElementById('pause-overlay').style.display = 'none';
             document.getElementById('game-over-screen').style.display = 'none';
             document.getElementById('level-clear-overlay').style.display = 'none';
             document.getElementById('boss-victory').style.display = 'none';
+            document.getElementById('endless-overlay').style.display = 'none';
+            document.getElementById('endless-difficulty-bar').style.display = 'none';
+            document.getElementById('endless-level-label').style.display = 'none';
+            document.getElementById('endless-leaderboard').style.display = 'none';
             document.getElementById('start-screen').style.display = 'flex';
             document.getElementById('crosshair').style.display = 'none';
             document.getElementById('pause-btn').style.display = 'none';
@@ -2018,18 +2742,19 @@
         }
 
         document.getElementById('back-to-start').addEventListener('click', () => {
+            playClickSound();
             document.getElementById('world-select-screen').style.display = 'none';
             document.getElementById('start-screen').style.display = 'flex';
         });
 
-        document.getElementById('world-btn').addEventListener('click', showWorldSelect);
-        document.getElementById('world-select-btn').addEventListener('click', showWorldSelect);
+        document.getElementById('world-btn').addEventListener('click', () => { playClickSound(); showWorldSelect(); });
+        document.getElementById('world-select-btn').addEventListener('click', () => { playClickSound(); showWorldSelect(); });
 
         // ============ GAME LOOP ============
         let lastSpawnTime = 0;
 
         function spawnLoop(time) {
-            if (gameRunning && !gamePaused && time - lastSpawnTime > spawnInterval) {
+            if (gameRunning && !gamePaused && !endlessMode && time - lastSpawnTime > spawnInterval) {
                 const available = holes.map((h, i) => i).filter(i => !holes[i].occupied);
                 if (available.length > 0) {
                     const holeIndex = available[Math.floor(Math.random() * available.length)];
@@ -2079,7 +2804,10 @@
             moles.forEach(moleData => {
                 if (moleData.hit || moleData.isPowerup) return;
                 moleData.timer++;
-                if (!freezeActive && moleData.timer > moleDuration) {
+                const effectiveDuration = endlessMode 
+                    ? (freezeActive ? endlessMoleDuration * 1.5 : endlessMoleDuration)
+                    : (freezeActive ? moleDuration * 1.5 : moleDuration);
+                if (moleData.timer > effectiveDuration) {
                     moleData.state = 'hiding';
                     hideMole(moleData);
                 }
@@ -2144,6 +2872,7 @@
             // Show boss after 2 seconds
             setTimeout(() => {
                 if (gameRunning) {
+                    playBossSound();
                     showBoss();
                 }
             }, 2000);
@@ -2212,6 +2941,10 @@
         }
 
         function endLevel() {
+            if (endlessMode) {
+                endEndlessMode();
+                return;
+            }
             gameRunning = false;
             clearInterval(gameTimer);
             document.getElementById('crosshair').style.display = 'none';
@@ -2241,6 +2974,20 @@
             if (stars > 0) {
                 setLevelStars(currentWorld, currentLevel, stars);
             }
+
+            // Update persistent stats
+            const data = getSaveData();
+            if (finalScore > (data.maxScore || 0)) {
+                data.maxScore = finalScore;
+            }
+            // Check for perfect accuracy (100%)
+            if (totalClicks > 0 && totalHits === totalClicks && stars > 0) {
+                data.perfectRounds = (data.perfectRounds || 0) + 1;
+            }
+            saveSaveData(data);
+
+            // Check level completion achievements
+            checkAchievements();
 
             // Show level clear or game over
             if (stars > 0) {
@@ -2286,6 +3033,7 @@
         }
 
         function showGameOver(finalScore, isNewRecord) {
+            playGameOverSound();
             const isRecord = finalScore > getSaveData().highScore;
             if (isRecord) {
                 const data = getSaveData();
@@ -2310,6 +3058,7 @@
 
         // Next level button
         document.getElementById('next-level-btn').addEventListener('click', () => {
+            playClickSound();
             document.getElementById('level-clear-overlay').style.display = 'none';
             const nextLevel = currentLevel + 1;
             if (nextLevel < LEVELS_PER_WORLD) {
@@ -2318,12 +3067,14 @@
         });
 
         document.getElementById('level-to-world-btn').addEventListener('click', () => {
+            playClickSound();
             document.getElementById('level-clear-overlay').style.display = 'none';
             showWorldSelect();
         });
 
         // Boss buttons
         document.getElementById('boss-next-btn').addEventListener('click', () => {
+            playClickSound();
             document.getElementById('boss-victory').style.display = 'none';
             // Continue to next world or replay
             if (currentWorld < TOTAL_WORLDS - 1) {
@@ -2334,14 +3085,37 @@
         });
 
         document.getElementById('boss-to-world-btn').addEventListener('click', () => {
+            playClickSound();
             document.getElementById('boss-victory').style.display = 'none';
             showWorldSelect();
         });
 
         // Initialize high score display
         document.getElementById('high-score-val').textContent = getSaveData().highScore;
+        
+        // Load and initialize sound setting
+        loadSoundSetting();
+        function updateSoundToggleUI() {
+            const btn = document.getElementById('sound-toggle-btn');
+            if (soundEnabled) {
+                btn.textContent = '🔊 音效开';
+                btn.style.background = 'linear-gradient(180deg, #4CAF50 0%, #388E3C 100%)';
+            } else {
+                btn.textContent = '🔇 音效关';
+                btn.style.background = 'linear-gradient(180deg, #f44336 0%, #c62828 100%)';
+            }
+        }
+        updateSoundToggleUI();
+        
+        document.getElementById('sound-toggle-btn').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            saveSoundSetting();
+            updateSoundToggleUI();
+            if (soundEnabled) playClickSound();
+        });
 
         document.getElementById('start-btn').addEventListener('click', () => {
+            playClickSound();
             // Start from first unlocked level
             const data = getSaveData();
             let startWorld = 0;
@@ -2374,14 +3148,30 @@
         });
 
         document.getElementById('restart-btn').addEventListener('click', () => {
+            playClickSound();
             if (levelMode === 'boss') {
                 startBossLevel(currentWorld);
+            } else if (levelMode === 'endless') {
+                startEndlessMode();
             } else {
                 startLevel(currentWorld, currentLevel);
             }
         });
 
-        document.getElementById('home-btn').addEventListener('click', goToStart);
+        document.getElementById('home-btn').addEventListener('click', () => { playClickSound(); goToStart(); });
+
+        // Endless mode button
+        document.getElementById('endless-btn').addEventListener('click', () => {
+            playClickSound();
+            startEndlessMode();
+        });
+
+        document.getElementById('endless-restart-btn').addEventListener('click', () => {
+            playClickSound();
+            startEndlessMode();
+        });
+
+        document.getElementById('endless-home-btn').addEventListener('click', () => { playClickSound(); goToStart(); });
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
