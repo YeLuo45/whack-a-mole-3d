@@ -596,6 +596,7 @@
         <div id="high-score-badge">最高分: <span id="high-score-val">0</span></div>
         <button class="btn" id="start-btn">开始游戏</button>
         <button class="btn btn-secondary btn-small" id="world-btn">选择关卡</button>
+        <button class="btn btn-secondary btn-small" id="achievement-btn">🏆 成就</button>
         <div style="margin-top: 15px;">
             <button class="btn btn-small" id="sound-toggle-btn" style="background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);">🔊 音效开</button>
         </div>
@@ -688,7 +689,7 @@
 
     <div id="achievement-screen">
         <h2>🏆 成就</h2>
-        <div id="achievement-progress">已解锁: <span id="achievement-unlocked-count">0</span>/16</div>
+        <div id="achievement-progress">已解锁: <span id="achievement-unlocked-count">0</span>/8</div>
         <div id="achievement-list"></div>
         <button class="btn" id="back-from-achievements">返回</button>
     </div>
@@ -696,16 +697,44 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script>
         // ============ GAME CONSTANTS ============
-        const WORLDS = ['森林', '矿山', '冰原', '熔岩'];
-        const LEVELS_PER_WORLD = 10;
+        const WORLDS = ['森林', '山脉', '冰原', '熔岩'];
+        const LEVELS_PER_WORLD = 5;
         const TOTAL_WORLDS = 4;
+        
+        // Level configurations: 4 worlds × 5 levels = 20 total levels
+        const LEVELS = [
+            // 世界1：森林
+            { world: 0, level: 0, target: 50, time: 30, stars: [15, 30, 50] },
+            { world: 0, level: 1, target: 70, time: 30, stars: [21, 42, 70] },
+            { world: 0, level: 2, target: 90, time: 30, stars: [27, 54, 90] },
+            { world: 0, level: 3, target: 110, time: 30, stars: [33, 66, 110] },
+            { world: 0, level: 4, target: 150, time: 30, stars: [45, 90, 150], hasBoss: true },
+            // 世界2：山脉
+            { world: 1, level: 0, target: 80, time: 30, stars: [24, 48, 80] },
+            { world: 1, level: 1, target: 100, time: 30, stars: [30, 60, 100] },
+            { world: 1, level: 2, target: 120, time: 30, stars: [36, 72, 120] },
+            { world: 1, level: 3, target: 140, time: 30, stars: [42, 84, 140] },
+            { world: 1, level: 4, target: 180, time: 30, stars: [54, 108, 180], hasBoss: true },
+            // 世界3：冰原
+            { world: 2, level: 0, target: 100, time: 30, stars: [30, 60, 100] },
+            { world: 2, level: 1, target: 120, time: 30, stars: [36, 72, 120] },
+            { world: 2, level: 2, target: 140, time: 30, stars: [42, 84, 140] },
+            { world: 2, level: 3, target: 160, time: 30, stars: [48, 96, 160] },
+            { world: 2, level: 4, target: 200, time: 30, stars: [60, 120, 200], hasBoss: true },
+            // 世界4：熔岩
+            { world: 3, level: 0, target: 120, time: 30, stars: [36, 72, 120] },
+            { world: 3, level: 1, target: 140, time: 30, stars: [42, 84, 140] },
+            { world: 3, level: 2, target: 160, time: 30, stars: [48, 96, 160] },
+            { world: 3, level: 3, target: 180, time: 30, stars: [54, 108, 180] },
+            { world: 3, level: 4, target: 220, time: 30, stars: [66, 132, 220], hasBoss: true },
+        ];
         
         // World themes [bg, ground, fog, hole rim, hole inner]
         const WORLD_THEMES = [
-            { bg: 0xf0e6d2, ground: 0xd4c4a8, fog: 0xf0e6d2, holeRim: 0x5a4a3a, holeInner: 0x3a2a1a, name: 'world-forest' },
-            { bg: 0x3d2817, ground: 0x5a4030, fog: 0x3d2817, holeRim: 0x4a3a2a, holeInner: 0x2a1a0a, name: 'world-mountain' },
-            { bg: 0x1a3a4a, ground: 0x3a6080, fog: 0x1a3a4a, holeRim: 0x6080a0, holeInner: 0x1a2a3a, name: 'world-ice' },
-            { bg: 0x2a0a0a, ground: 0x4a1a0a, fog: 0x2a0a0a, holeRim: 0xff4500, holeInner: 0x3a0a0a, name: 'world-lava' }
+            { bg: 0xf0e6d2, ground: 0x3d5c3d, fog: 0xf0e6d2, holeRim: 0x2d4a2d, holeInner: 0x1a3d1a, name: 'world-forest' },
+            { bg: 0xadd8e6, ground: 0x8b7355, fog: 0x8b7355, holeRim: 0x6b5344, holeInner: 0x4a3a2a, name: 'world-mountain' },
+            { bg: 0xe0f0ff, ground: 0xb0c4de, fog: 0xb0c4de, holeRim: 0x8fa8c4, holeInner: 0x6a8ab4, name: 'world-ice' },
+            { bg: 0xff4500, ground: 0x8b2500, fog: 0x8b2500, holeRim: 0x6b1a00, holeInner: 0x4a0a00, name: 'world-lava' }
         ];
 
         // New items for World 4
@@ -716,18 +745,20 @@
 
         // Level configs: [baseSpawnInterval, moleDuration (frames at 60fps), scoreThreshold]
         function getLevelConfig(worldIdx, levelIdx) {
+            const levelData = LEVELS[worldIdx * 5 + levelIdx];
+            if (!levelData) {
+                return { spawnInterval: 1200, moleDuration: 60, scoreThreshold: 500, timeLimit: 30 };
+            }
+            
             const baseInterval = 1200;
             const baseDuration = 60;
-            const baseThreshold = 500;
-            
-            const speedBonus = (worldIdx * 10 + levelIdx) * 0.08; // +8% per level
-            const thresholdBonus = (worldIdx * 10 + levelIdx) * 0.15; // +15% per level
+            const speedBonus = (worldIdx * 5 + levelIdx) * 0.08;
             
             return {
                 spawnInterval: Math.max(600, baseInterval * (1 - speedBonus)),
                 moleDuration: Math.max(30, baseDuration * (1 - speedBonus * 0.5)),
-                scoreThreshold: Math.floor(baseThreshold * (1 + thresholdBonus)),
-                timeLimit: 30 + levelIdx * 2 // +2s per level within world
+                scoreThreshold: levelData.target,
+                timeLimit: levelData.time
             };
         }
 
@@ -1059,7 +1090,7 @@
             if (data) return JSON.parse(data);
             return {
                 version: 2,
-                levels: [[0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0]],
+                levels: [[0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0]],
                 bossHP: 100,
                 bossMaxHP: 100,
                 highScore: 0,
@@ -1072,7 +1103,13 @@
                 endlessHighScores: [],
                 moleSkins: 0,
                 hammerSkins: 0,
-                loginStreak: 0
+                loginStreak: 0,
+                // Achievement tracking stats
+                comboHits: 0,
+                speedHits: 0,
+                goldenHits: 0,
+                noMissLevel: false,
+                firstHit: false
             };
         }
 
@@ -1095,9 +1132,9 @@
         function isWorldUnlocked(worldIdx) {
             if (worldIdx === 0) return true;
             const data = getSaveData();
-            // World is unlocked if previous world has at least 1 star on any level
-            const prevWorld = data.levels[worldIdx - 1];
-            return prevWorld && prevWorld.some(s => s > 0);
+            // World is unlocked if previous world has 3 stars on the boss level (level 4)
+            const prevWorldLevels = data.levels[worldIdx - 1];
+            return prevWorldLevels && prevWorldLevels[4] === 3;
         }
 
         function isBossDefeated(worldIdx) {
@@ -1108,23 +1145,14 @@
 
         // ============ ACHIEVEMENT SYSTEM ============
         const ACHIEVEMENTS = [
-            // 新手成就
-            { id: 'first_level', name: '初出茅庐', desc: '完成第1关', icon: '🎯', reward: 50, condition: (s) => s.levelsCompleted >= 1 },
-            { id: 'first_hit', name: '第一锤', desc: '击中第1只地鼠', icon: '🔨', reward: 10, condition: (s) => s.totalHits >= 1 },
-            // 进阶成就
-            { id: 'combo_5', name: '连击达人', desc: '单局达成5连击', icon: '🔥', reward: 30, condition: (s) => s.maxCombo >= 5 },
-            { id: 'combo_10', name: '超级连击', desc: '单局达成10连击', icon: '⚡', reward: 100, condition: (s) => s.maxCombo >= 10 },
-            { id: 'score_500', name: '火力全开', desc: '单局分数超过500', icon: '💥', reward: 50, condition: (s) => s.maxScore >= 500 },
-            { id: 'perfect', name: '精准打击', desc: '单局命中率100%', icon: '🎯', reward: 200, condition: (s) => s.perfectRounds >= 1 },
-            // 收集成就
-            { id: 'mole_collector', name: '收藏家', desc: '拥有3个地鼠皮肤', icon: '🐹', reward: 100, condition: (s) => s.moleSkins >= 3 },
-            { id: 'hammer_collector', name: '锤子收藏家', desc: '拥有2个锤子皮肤', icon: '🔨', reward: 100, condition: (s) => s.hammerSkins >= 2 },
-            { id: 'streak_7', name: '签到一周', desc: '连续签到7天', icon: '📅', reward: 150, condition: (s) => s.loginStreak >= 7 },
-            // 模式成就
-            { id: 'endless_1000', name: '无尽探索', desc: '无尽模式分数超过1000', icon: '♾️', reward: 200, condition: (s) => (s.endlessHighScores && s.endlessHighScores[0] >= 1000) },
-            { id: 'endless_3000', name: '无尽狂热', desc: '无尽模式分数超过3000', icon: '🌟', reward: 500, condition: (s) => (s.endlessHighScores && s.endlessHighScores[0] >= 3000) },
-            { id: 'boss_killer', name: 'Boss克星', desc: '击败火焰巨人Boss', icon: '👹', reward: 300, condition: (s) => s.bossDefeated },
-            { id: 'world_conqueror', name: '世界征服', desc: '通关所有40关', icon: '🏰', reward: 500, condition: (s) => s.levelsCompleted >= 40 },
+            { id: 'first_hit', name: '初次命中', desc: '击中第一个地鼠', icon: '🎯', reward: 0, condition: (s) => s.firstHit },
+            { id: 'combo_5', name: '五连击', desc: '连续击中5个地鼠', icon: '🔥', reward: 100, condition: (s) => s.comboHits >= 5 },
+            { id: 'perfect_world', name: '完美世界', desc: '一整个世界全部3星通关', icon: '⭐', reward: 500, condition: (s) => s.perfectWorld },
+            { id: 'boss_slayer', name: 'Boss克星', desc: '击败第一个Boss', icon: '💀', reward: 200, condition: (s) => s.bossDefeated },
+            { id: 'no_miss', name: '零失误', desc: '一关中没有任何漏打', icon: '🛡', reward: 150, condition: (s) => s.noMissLevel },
+            { id: 'speed_demon', name: '速度恶魔', desc: '3秒内连续击中3个地鼠', icon: '⚡', reward: 300, condition: (s) => s.speedHits >= 3 },
+            { id: 'golden_rush', name: '金色狂潮', desc: '连续击中5个金色地鼠', icon: '🪙', reward: 250, condition: (s) => s.goldenHits >= 5 },
+            { id: 'world_4', name: '征服者', desc: '通关熔岩世界', icon: '👑', reward: 1000, condition: (s) => s.world4Complete },
         ];
 
         // Achievement state helpers
@@ -1175,6 +1203,19 @@
             const bossDefeated = data.bossHP !== undefined && data.bossHP <= 0;
             const endlessScores = data.endlessHighScores || [];
             const endlessHighScore = endlessScores.length > 0 ? Math.max(...endlessScores) : 0;
+            
+            // Check for perfect world (all 3 stars in a world)
+            let perfectWorld = false;
+            for (let w = 0; w < 4; w++) {
+                if (data.levels[w] && data.levels[w].every(s => s === 3)) {
+                    perfectWorld = true;
+                    break;
+                }
+            }
+            
+            // Check if world 4 (lava) is complete (3 stars on all 5 levels)
+            const world4Complete = data.levels[3] && data.levels[3].every(s => s === 3);
+            
             return {
                 levelsCompleted: completedLevels + (bossDefeated ? 1 : 0),
                 totalHits: data.totalHits || 0,
@@ -1185,7 +1226,14 @@
                 hammerSkins: data.hammerSkins || 0,
                 loginStreak: data.loginStreak || 0,
                 endlessHighScore: endlessHighScore,
-                bossDefeated: bossDefeated
+                bossDefeated: bossDefeated,
+                firstHit: data.firstHit || false,
+                comboHits: data.comboHits || 0,
+                speedHits: data.speedHits || 0,
+                goldenHits: data.goldenHits || 0,
+                noMissLevel: data.noMissLevel || false,
+                perfectWorld: perfectWorld,
+                world4Complete: world4Complete
             };
         }
 
@@ -2256,6 +2304,13 @@
         }
 
         function hideMole(moleData) {
+            // If mole wasn't hit, player missed it - noMissLevel achievement fails
+            if (!moleData.hit && !moleData.isPowerup) {
+                const data = getSaveData();
+                data.noMissLevel = false;
+                saveSaveData(data);
+            }
+            
             const mole = moleData.mesh;
             const holeIndex = moleData.holeIndex;
             
@@ -2388,6 +2443,37 @@
             if (combo + 1 > (data.maxCombo || 0)) {
                 data.maxCombo = combo + 1;
             }
+            
+            // Track first hit achievement
+            if (!data.firstHit) {
+                data.firstHit = true;
+            }
+            
+            // Track combo hits (for combo_5 achievement)
+            data.comboHits = Math.max(data.comboHits || 0, combo + 1);
+            
+            // Track speed hits (for speed_demon achievement - 3 hits in 3 seconds)
+            const now = Date.now();
+            if (!data.lastHitTimes) data.lastHitTimes = [];
+            data.lastHitTimes.push(now);
+            // Keep only hits in last 3 seconds
+            data.lastHitTimes = data.lastHitTimes.filter(t => now - t < 3000);
+            data.speedHits = data.lastHitTimes.length;
+            
+            // Track golden hits (for golden_rush achievement)
+            if (type === 'golden') {
+                if (!data.goldenHitStreak) data.goldenHitStreak = 0;
+                data.goldenHitStreak++;
+                if (data.goldenHitStreak > (data.goldenHits || 0)) {
+                    data.goldenHits = data.goldenHitStreak;
+                }
+            } else {
+                data.goldenHitStreak = 0;
+            }
+            
+            // Track noMissLevel achievement - will be set false if any mole escapes
+            data.noMissLevel = true;
+            
             saveSaveData(data);
 
             // Check hit-based achievements
@@ -2956,10 +3042,14 @@
                 saveSaveData(data);
             }
 
-            // Calculate stars based on score threshold
-            const stars = finalScore >= config.scoreThreshold * 3 ? 3 
-                : finalScore >= config.scoreThreshold * 2 ? 2 
-                : finalScore >= config.scoreThreshold ? 1 : 0;
+            // Calculate stars based on level's stars array
+            const levelData = LEVELS[currentWorld * 5 + currentLevel];
+            let stars = 0;
+            if (levelData) {
+                if (finalScore >= levelData.stars[2]) stars = 3;
+                else if (finalScore >= levelData.stars[1]) stars = 2;
+                else if (finalScore >= levelData.stars[0]) stars = 1;
+            }
             
             // Save progress
             if (stars > 0) {
