@@ -1089,8 +1089,8 @@
                     const rimMat = new THREE.MeshStandardMaterial({ 
                         color: theme.holeRim, 
                         roughness: 0.8,
-                        emissive: worldIdx === 3 ? 0xff2200 : 0x000000,
-                        emissiveIntensity: worldIdx === 3 ? 0.3 : 0
+                        emissive: theme.name === 'world-lava' ? 0xff2200 : 0x000000,
+                        emissiveIntensity: theme.name === 'world-lava' ? 0.3 : 0
                     });
                     const rim = new THREE.Mesh(rimGeo, rimMat);
                     rim.rotation.x = -Math.PI / 2;
