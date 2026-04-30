@@ -600,7 +600,7 @@
         <div style="margin-top: 15px;">
             <button class="btn btn-small" id="sound-toggle-btn" style="background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);">🔊 音效开</button>
         </div>
-        <p class="instructions">普通地鼠 +10分 | 金色地鼠 +50分 | 炸弹 -20分<br>快速连击获得分数加成！</p>
+        <p class="instructions">普通地鼠 +10分 | 金色地鼠 +50分 | 银色地鼠 +30分+随机技能 | 彩虹地鼠 +100分+全技能<br>炸弹 -20分 | 连击得更高倍数分数！</p>
     </div>
 
     <div id="world-select-screen">
@@ -624,6 +624,10 @@
             <div class="stat-item">
                 <div class="stat-value" id="stat-hits">0</div>
                 <div class="stat-label">击中次数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-misses">0</div>
+                <div class="stat-label">漏打次数</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="stat-time">0s</div>
@@ -1329,16 +1333,18 @@
         // Stats
         let totalClicks = 0;
         let totalHits = 0;
+        let totalMisses = 0;
         let bestCombo = 0;
         let gameStartTime = 0;
         let pausedTime = 0;
         let totalPausedTime = 0;
 
-        // Combo
+        // Combo system v3: 2秒超时, 5x/3x/2x/1x倍率
         let combo = 0;
-        let comboTimer = 0;
-        const comboTimeout = 60;
+        let comboTimer = null;
+        let comboMultiplier = 1;
         let lastHitTime = 0;
+        const COMBO_TIMEOUT_MS = 2000;
 
         // Power-ups
         let doubleScoreActive = false;
@@ -1516,9 +1522,13 @@
                     } else if (available.length > 0) {
                         const holeIndex = available[Math.floor(Math.random() * available.length)];
                         const rand = Math.random();
-                        if (rand < 0.30) {
+                        if (rand < 0.25) {
                             showMole(holeIndex, 'golden');
-                        } else if (rand < 0.38) {
+                        } else if (rand < 0.30) {
+                            showMole(holeIndex, 'silver');
+                        } else if (rand < 0.33) {
+                            showMole(holeIndex, 'rainbow');
+                        } else if (rand < 0.40) {
                             showMole(holeIndex, 'bomb');
                         } else {
                             showMole(holeIndex, 'normal');
@@ -2028,6 +2038,26 @@
             playLevelUpSound();
         }
 
+        // ============ MOLE TYPES (v3) ============
+        const MOLE_TYPES = {
+            normal: { color: 0x8B6914, weight: 0.5 },
+            golden: { color: 0xffd700, emissive: 0xff8c00, weight: 0.2 },
+            bomb: { color: 0x333333, weight: 0.08 },
+            fire: { color: 0xff4500, emissive: 0xff2200, weight: 0.07 },
+            silver: { color: 0xc0c0c0, emissive: 0x808080, weight: 0.075 },
+            rainbow: { color: 0xff00ff, emissive: 0x00ffff, weight: 0.075 }
+        };
+
+        function getRandomMoleType() {
+            const rand = Math.random();
+            let cumulative = 0;
+            for (const [type, cfg] of Object.entries(MOLE_TYPES)) {
+                cumulative += cfg.weight;
+                if (rand < cumulative) return type;
+            }
+            return 'normal';
+        }
+
         // ============ MOLE CREATION ============
         function createMole(type = 'normal') {
             const moleGroup = new THREE.Group();
@@ -2037,16 +2067,32 @@
             let bodyColor;
             let roughness = 0.7;
             let metalness = 0;
+            let emissive = 0x000000;
+            let emissiveIntensity = 0;
 
             if (type === 'golden') {
                 bodyColor = 0xffd700;
                 metalness = 0.5;
+                emissive = 0xff8c00;
+                emissiveIntensity = 0.2;
             } else if (type === 'bomb') {
                 bodyColor = 0x333333;
             } else if (type === 'fire') {
-                // Fire mole for World 4
                 bodyColor = 0xff4500;
                 roughness = 0.5;
+                emissive = 0xff2200;
+                emissiveIntensity = 0.2;
+            } else if (type === 'silver') {
+                bodyColor = 0xc0c0c0;
+                metalness = 0.8;
+                emissive = 0x808080;
+                emissiveIntensity = 0.3;
+            } else if (type === 'rainbow') {
+                // Rainbow: cycle through hue
+                bodyColor = 0xff00ff;
+                emissive = 0x00ffff;
+                emissiveIntensity = 0.4;
+                metalness = 0.6;
             } else {
                 bodyColor = 0x8B6914;
             }
@@ -2055,8 +2101,8 @@
                 color: bodyColor, 
                 roughness, 
                 metalness,
-                emissive: type === 'fire' ? 0xff2200 : 0x000000,
-                emissiveIntensity: type === 'fire' ? 0.2 : 0
+                emissive,
+                emissiveIntensity
             });
             const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
             const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -2098,7 +2144,7 @@
                 rightEye.name = 'rightEye';
                 moleGroup.add(rightEye);
             } else {
-                const snoutColor = type === 'golden' ? 0xffa500 : type === 'fire' ? 0xff6600 : 0x6B4E0A;
+                const snoutColor = type === 'golden' ? 0xffa500 : type === 'fire' ? 0xff6600 : type === 'silver' ? 0xd0d0d0 : type === 'rainbow' ? 0xff88ff : 0x6B4E0A;
                 const snoutGeo = new THREE.SphereGeometry(0.15, 16, 16);
                 const snoutMat = new THREE.MeshStandardMaterial({ color: snoutColor, roughness: 0.8 });
                 const snout = new THREE.Mesh(snoutGeo, snoutMat);
@@ -2107,7 +2153,7 @@
                 snout.name = 'snout';
                 moleGroup.add(snout);
 
-                const noseColor = type === 'golden' ? 0xff6600 : type === 'fire' ? 0xff0000 : 0xff6699;
+                const noseColor = type === 'golden' ? 0xff6600 : type === 'fire' ? 0xff0000 : type === 'silver' ? 0xaaaaaa : type === 'rainbow' ? 0xff44ff : 0xff6699;
                 const noseGeo = new THREE.SphereGeometry(0.06, 16, 16);
                 const noseMat = new THREE.MeshStandardMaterial({ color: noseColor, roughness: 0.5 });
                 const nose = new THREE.Mesh(noseGeo, noseMat);
@@ -2149,7 +2195,7 @@
                 rightEar.name = 'rightEar';
                 moleGroup.add(rightEar);
 
-                const cheekColor = type === 'golden' ? 0xffffaa : type === 'fire' ? 0xffaaaa : 0xffaaaa;
+                const cheekColor = type === 'golden' ? 0xffffaa : type === 'fire' ? 0xffaaaa : type === 'silver' ? 0xeeeeee : type === 'rainbow' ? 0xffccff : 0xffaaaa;
                 const cheekGeo = new THREE.SphereGeometry(0.1, 16, 16);
                 const cheekMat = new THREE.MeshStandardMaterial({ color: cheekColor, transparent: true, opacity: 0.5 });
                 const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
@@ -2304,8 +2350,9 @@
         }
 
         function hideMole(moleData) {
-            // If mole wasn't hit, player missed it - noMissLevel achievement fails
-            if (!moleData.hit && !moleData.isPowerup) {
+            // If mole wasn't hit, player missed it - track for stats
+            if (!moleData.hit && !moleData.isPowerup && gameRunning) {
+                totalMisses++;
                 const data = getSaveData();
                 data.noMissLevel = false;
                 saveSaveData(data);
@@ -2351,19 +2398,27 @@
 
         function updateComboBar() {
             const bar = document.getElementById('combo-bar');
-            const pct = Math.max(0, 100 - (comboTimer / comboTimeout) * 100);
+            if (!bar) return;
+            // comboMultiplier 1-5, show decay based on remaining time
+            const elapsed = Date.now() - lastHitTime;
+            const remaining = Math.max(0, COMBO_TIMEOUT_MS - elapsed);
+            const pct = (remaining / COMBO_TIMEOUT_MS) * 100;
             bar.style.width = pct + '%';
         }
 
         function showComboBreak() {
             if (combo >= 3) {
                 const el = document.getElementById('combo-break');
-                el.classList.remove('hide');
-                el.classList.add('show');
-                playComboBreakSound();
-                setTimeout(() => { el.classList.remove('show'); el.classList.add('hide'); }, 500);
+                if (el) {
+                    el.classList.remove('hide');
+                    el.classList.add('show');
+                    playComboBreakSound();
+                    setTimeout(() => { el.classList.remove('show'); el.classList.add('hide'); }, 500);
+                }
             }
             combo = 0;
+            comboMultiplier = 1;
+            if (comboTimer) { clearTimeout(comboTimer); comboTimer = null; }
             updateComboDisplay();
         }
 
@@ -2372,7 +2427,7 @@
             const count = document.getElementById('combo-count');
             if (combo >= 2) {
                 display.style.display = 'inline';
-                count.textContent = combo + 'x';
+                count.textContent = combo + 'x' + (comboMultiplier > 1 ? ' ×' + comboMultiplier : '');
             } else {
                 display.style.display = 'none';
             }
@@ -2389,9 +2444,9 @@
         }
 
         function getComboMultiplier() {
-            if (combo >= 20) return 3;
-            if (combo >= 10) return 2;
-            if (combo >= 5) return 1.5;
+            if (combo >= 20) return 5;
+            if (combo >= 10) return 3;
+            if (combo >= 5) return 2;
             return 1;
         }
 
@@ -2400,6 +2455,46 @@
             if (combo >= 5) return 2;
             if (combo >= 3) return 1.5;
             return 1;
+        }
+
+        // ============ v3 COMBO SYSTEM ============
+        function onMoleHit() {
+            combo++;
+            lastHitTime = Date.now();
+            if (comboTimer) clearTimeout(comboTimer);
+            comboTimer = setTimeout(() => {
+                showComboBreak();
+            }, COMBO_TIMEOUT_MS);
+
+            // Calculate multiplier
+            if (combo >= 20) comboMultiplier = 5;
+            else if (combo >= 10) comboMultiplier = 3;
+            else if (combo >= 5) comboMultiplier = 2;
+            else comboMultiplier = 1;
+
+            if (combo > bestCombo) bestCombo = combo;
+            updateComboDisplay();
+            updateComboBar();
+        }
+
+        function playComboSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                // Higher pitch for higher combo
+                const basePitch = 440 + (comboMultiplier * 110);
+                osc.frequency.setValueAtTime(basePitch, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(basePitch * 1.5, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.25, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.15);
+            } catch(e) {}
         }
 
         function activatePowerup(type) {
@@ -2435,44 +2530,15 @@
         function whackMole(moleData) {
             if (moleData.hit) return;
             moleData.hit = true;
-            totalHits++;
 
             // Update persistent stats for achievements
             const data = getSaveData();
             data.totalHits = (data.totalHits || 0) + 1;
-            if (combo + 1 > (data.maxCombo || 0)) {
-                data.maxCombo = combo + 1;
-            }
             
             // Track first hit achievement
             if (!data.firstHit) {
                 data.firstHit = true;
             }
-            
-            // Track combo hits (for combo_5 achievement)
-            data.comboHits = Math.max(data.comboHits || 0, combo + 1);
-            
-            // Track speed hits (for speed_demon achievement - 3 hits in 3 seconds)
-            const now = Date.now();
-            if (!data.lastHitTimes) data.lastHitTimes = [];
-            data.lastHitTimes.push(now);
-            // Keep only hits in last 3 seconds
-            data.lastHitTimes = data.lastHitTimes.filter(t => now - t < 3000);
-            data.speedHits = data.lastHitTimes.length;
-            
-            // Track golden hits (for golden_rush achievement)
-            if (type === 'golden') {
-                if (!data.goldenHitStreak) data.goldenHitStreak = 0;
-                data.goldenHitStreak++;
-                if (data.goldenHitStreak > (data.goldenHits || 0)) {
-                    data.goldenHits = data.goldenHitStreak;
-                }
-            } else {
-                data.goldenHitStreak = 0;
-            }
-            
-            // Track noMissLevel achievement - will be set false if any mole escapes
-            data.noMissLevel = true;
             
             saveSaveData(data);
 
@@ -2492,13 +2558,47 @@
                 showScorePopup(x, y, text, color);
                 const particleColor = moleData.powerupType === 'double' ? 0xffd700 : moleData.powerupType === 'freeze' ? 0x4ecdc4 : 0xff4500;
                 spawnHitParticles(pos.x, pos.y, pos.z, particleColor, 20);
+                playPowerupSound();
                 hideMole(moleData);
                 return;
             }
 
             const type = moleData.moleType;
 
-            if (type === 'bomb') {
+            // v3 Special moles handling
+            if (type === 'silver') {
+                playWhackSound();
+                playComboSound();
+                onMoleHit(); // Trigger combo system
+                let pts = 30 * comboMultiplier;
+                if (doubleScoreActive) pts *= 2;
+                score += pts;
+                totalHits++;
+                document.getElementById('score-display').textContent = score;
+                showHitEffect(x, y, '#c0c0c0');
+                showScorePopup(x, y, '+' + Math.floor(pts), '#c0c0c0');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xc0c0c0, 20);
+                setMoleHitExpression(moleData.mesh, type);
+                // Silver mole: random powerup activation
+                activateRandomPowerup();
+            } else if (type === 'rainbow') {
+                playGoldenSound();
+                playComboSound();
+                onMoleHit();
+                let pts = 100 * comboMultiplier;
+                if (doubleScoreActive) pts *= 2;
+                score += pts;
+                totalHits++;
+                document.getElementById('score-display').textContent = score;
+                showHitEffect(x, y, '#ff00ff');
+                showScorePopup(x, y, '+' + Math.floor(pts), '#ff00ff');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xff00ff, 30);
+                spawnHitParticles(pos.x, pos.y, pos.z, 0x00ffff, 30);
+                setMoleHitExpression(moleData.mesh, type);
+                // Rainbow mole: reset cooldowns and activate all
+                resetAllCooldowns();
+                activateAllPowerups();
+            } else if (type === 'bomb') {
                 // Check fire shield first
                 if (fireShieldActive) {
                     fireShieldActive = false;
@@ -2510,6 +2610,7 @@
                 }
                 
                 playBombSound();
+                showComboBreak(); // Bomb breaks combo
                 let pts = -20;
                 if (doubleScoreActive) pts *= 2;
                 score += pts;
@@ -2517,55 +2618,50 @@
                 showHitEffect(x, y, '#ff0000');
                 showScorePopup(x, y, pts + '', '#ff4444');
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 25);
-                showComboBreak();
             } else if (type === 'golden') {
                 playGoldenSound();
-                combo++;
-                lastHitTime = Date.now();
-                comboTimer = 0;
+                playComboSound();
+                onMoleHit();
                 let pts = 50;
-                pts = Math.floor(pts * (endlessMode ? getEndlessComboMultiplier() : getComboMultiplier()));
                 if (doubleScoreActive) pts *= 2;
                 score += pts;
+                totalHits++;
                 document.getElementById('score-display').textContent = score;
                 showHitEffect(x, y, '#ffd700');
-                showScorePopup(x, y, '+' + pts, '#ffd700');
+                showScorePopup(x, y, '+' + Math.floor(pts), '#ffd700');
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xffd700, 20);
-                playWhackSound();
                 setMoleHitExpression(moleData.mesh, type);
+                playWhackSound();
             } else if (type === 'fire') {
                 // Fire mole - part of boss battle interference
                 playWhackSound();
-                combo++;
-                lastHitTime = Date.now();
-                comboTimer = 0;
+                playComboSound();
+                onMoleHit();
                 let pts = 10;
-                pts = Math.floor(pts * (endlessMode ? getEndlessComboMultiplier() : getComboMultiplier()));
                 if (doubleScoreActive) pts *= 2;
                 score += pts;
+                totalHits++;
                 document.getElementById('score-display').textContent = score;
                 showHitEffect(x, y, '#ff4500');
-                showScorePopup(x, y, '+' + pts, '#ff4500');
+                showScorePopup(x, y, '+' + Math.floor(pts), '#ff4500');
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 15);
                 setMoleHitExpression(moleData.mesh, type);
             } else {
+                // Normal mole
                 playWhackSound();
-                combo++;
-                lastHitTime = Date.now();
-                comboTimer = 0;
+                playComboSound();
+                onMoleHit();
                 let pts = 10;
-                pts = Math.floor(pts * (endlessMode ? getEndlessComboMultiplier() : getComboMultiplier()));
                 if (doubleScoreActive) pts *= 2;
                 score += pts;
+                totalHits++;
                 document.getElementById('score-display').textContent = score;
                 showHitEffect(x, y, '#ff6b6b');
-                showScorePopup(x, y, '+' + pts, '#ff6b6b');
+                showScorePopup(x, y, '+' + Math.floor(pts), '#ff6b6b');
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xff6b6b, 15);
                 setMoleHitExpression(moleData.mesh, type);
             }
 
-            updateComboDisplay();
-            showEndlessComboBonus(x, y, endlessMode ? getEndlessComboMultiplier() : 1);
             triggerHitVibration(combo);
 
             if (score >= 10 && score > lastMilestone) {
@@ -2591,6 +2687,45 @@
                 }
             }
             animateWhack();
+        }
+
+        // ============ v3 POWERUP HELPERS ============
+        function activateRandomPowerup() {
+            const available = [];
+            if (!doubleScoreActive) available.push('double');
+            if (!freezeActive) available.push('freeze');
+            if (!fireShieldActive) available.push('fireShield');
+            if (available.length > 0) {
+                const pick = available[Math.floor(Math.random() * available.length)];
+                activatePowerup(pick);
+                showScorePopup(window.innerWidth / 2, window.innerHeight / 2 - 100, getPowerupText(pick), '#ffd700');
+            }
+        }
+
+        function resetAllCooldowns() {
+            if (doubleScoreTimer) { clearTimeout(doubleScoreTimer); doubleScoreTimer = null; }
+            if (freezeTimer) { clearTimeout(freezeTimer); freezeTimer = null; }
+            if (shieldTimer) { clearTimeout(shieldTimer); shieldTimer = null; }
+            doubleScoreActive = false;
+            freezeActive = false;
+            fireShieldActive = false;
+            document.getElementById('badge-double')?.classList.remove('active');
+            document.getElementById('badge-freeze')?.classList.remove('active');
+            document.getElementById('badge-shield')?.classList.remove('active');
+        }
+
+        function activateAllPowerups() {
+            activatePowerup('double');
+            activatePowerup('freeze');
+            activatePowerup('fireShield');
+            showScorePopup(window.innerWidth / 2, window.innerHeight / 2 - 100, '全技能激活！', '#ff00ff');
+        }
+
+        function getPowerupText(type) {
+            if (type === 'double') return '双倍得分！';
+            if (type === 'freeze') return '冻结！';
+            if (type === 'fireShield') return '护盾！';
+            return '';
         }
 
         function showHitEffect(x, y, color = '#c44') {
@@ -2842,22 +2977,27 @@
                         if (rand < 0.15) showMole(holeIndex, 'fire');
                         else if (rand < 0.25) showPowerup(holeIndex, 'fireShield');
                         else if (rand < 0.30) showPowerup(holeIndex, 'freeze');
-                        else showMole(holeIndex, 'normal');
+                        else showMole(holeIndex, getRandomMoleType());
                     } else {
                         // Normal spawning based on world
                         if (worldIdx === 3) {
                             // Lava world - more fire moles
-                            if (rand < 0.30) showMole(holeIndex, 'golden');
-                            else if (rand < 0.38) showMole(holeIndex, 'bomb');
-                            else if (rand < 0.23) showMole(holeIndex, 'fire');
-                            else if (rand < 0.26) showPowerup(holeIndex, 'fireShield');
-                            else if (rand < 0.28) showPowerup(holeIndex, 'lavaFreeze');
+                            if (rand < 0.25) showMole(holeIndex, 'golden');
+                            else if (rand < 0.33) showMole(holeIndex, 'silver');
+                            else if (rand < 0.38) showMole(holeIndex, 'rainbow');
+                            else if (rand < 0.45) showMole(holeIndex, 'bomb');
+                            else if (rand < 0.28) showMole(holeIndex, 'fire');
+                            else if (rand < 0.31) showPowerup(holeIndex, 'fireShield');
+                            else if (rand < 0.33) showPowerup(holeIndex, 'lavaFreeze');
                             else showMole(holeIndex, 'normal');
                         } else {
-                            if (rand < 0.30) showMole(holeIndex, 'golden');
-                            else if (rand < 0.38) showMole(holeIndex, 'bomb');
-                            else if (rand < 0.19) showPowerup(holeIndex, 'double');
-                            else if (rand < 0.22) showPowerup(holeIndex, 'freeze');
+                            // v3: Use getRandomMoleType for balanced spawning
+                            if (rand < 0.05) showMole(holeIndex, 'silver');
+                            else if (rand < 0.08) showMole(holeIndex, 'rainbow');
+                            else if (rand < 0.28) showMole(holeIndex, 'golden');
+                            else if (rand < 0.36) showMole(holeIndex, 'bomb');
+                            else if (rand < 0.44) showPowerup(holeIndex, 'double');
+                            else if (rand < 0.52) showPowerup(holeIndex, 'freeze');
                             else showMole(holeIndex, 'normal');
                         }
                     }
@@ -2872,10 +3012,14 @@
         setInterval(() => {
             if (!gameRunning || gamePaused) return;
 
+            // Update combo bar with new timer-based approach
             if (combo > 0) {
-                comboTimer++;
                 updateComboBar();
-                if (comboTimer >= comboTimeout) showComboBreak();
+                // Check if combo expired
+                const elapsed = Date.now() - lastHitTime;
+                if (elapsed >= COMBO_TIMEOUT_MS) {
+                    showComboBreak();
+                }
             }
 
             moles.forEach(moleData => {
@@ -2963,10 +3107,12 @@
             lastMilestone = 0;
             praiseIndex = 0;
             combo = 0;
-            comboTimer = 0;
+            comboTimer = null;
+            comboMultiplier = 1;
             lastHitTime = 0;
             totalClicks = 0;
             totalHits = 0;
+            totalMisses = 0;
             bestCombo = 0;
             gameStartTime = Date.now();
             totalPausedTime = 0;
@@ -2976,6 +3122,7 @@
             if (doubleScoreTimer) clearTimeout(doubleScoreTimer);
             if (freezeTimer) clearTimeout(freezeTimer);
             if (shieldTimer) clearTimeout(shieldTimer);
+            if (comboTimer) clearTimeout(comboTimer);
             
             document.getElementById('score-display').textContent = '0';
             document.getElementById('time-display').textContent = timeLeft;
@@ -3123,12 +3270,13 @@
             }
 
             const effectiveTime = Math.floor((Date.now() - gameStartTime - totalPausedTime) / 1000);
-            const accuracy = totalClicks > 0 ? Math.round((totalHits / totalClicks) * 100) : 0;
+            const accuracy = (totalHits + totalMisses) > 0 ? Math.round((totalHits / (totalHits + totalMisses)) * 100) : 0;
 
             document.getElementById('final-score').textContent = finalScore;
             document.getElementById('stat-accuracy').textContent = accuracy + '%';
             document.getElementById('stat-combo').textContent = bestCombo + 'x';
             document.getElementById('stat-hits').textContent = totalHits;
+            document.getElementById('stat-misses').textContent = totalMisses;
             document.getElementById('stat-time').textContent = effectiveTime + 's';
 
             const recordBadge = document.getElementById('high-score-badge-end');
