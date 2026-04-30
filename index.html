@@ -1033,23 +1033,6 @@
             } catch(e) {}
         }
 
-        function playLevelUpSound() {
-            try {
-                const ctx = getAudioCtx();
-                [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.connect(gain); gain.connect(ctx.destination);
-                    osc.type = 'sine';
-                    osc.frequency.value = freq;
-                    const t = ctx.currentTime + i * 0.12;
-                    gain.gain.setValueAtTime(0.3, t);
-                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
-                    osc.start(t); osc.stop(t + 0.3);
-                });
-            } catch(e) {}
-        }
-
         const praises = ['太棒了！', '厉害！', '完美！', '继续保持！', '真厉害！', '精彩！', '无可阻挡！', '继续加油！', '太牛了！', '满分！', '无敌！', '再来！'];
         let praiseIndex = 0;
 
