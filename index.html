@@ -693,7 +693,7 @@
         <button class="btn" id="back-from-achievements">返回</button>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script>
         // ============ GAME CONSTANTS ============
         const WORLDS = ['森林', '矿山', '冰原', '熔岩'];
@@ -1060,8 +1060,8 @@
             return {
                 version: 2,
                 levels: [[0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0]],
-                bossHP: 10,
-                bossMaxHP: 10,
+                bossHP: 100,
+                bossMaxHP: 100,
                 highScore: 0,
                 achievements: {},
                 coins: 0,
@@ -1271,8 +1271,8 @@
         let levelMode = 'normal'; // 'normal' or 'boss' or 'endless'
 
         // Boss state
-        let bossHP = 10;
-        let bossMaxHP = 10;
+        let bossHP = 100;
+        let bossMaxHP = 100;
         let bossHitCount = 0;
         let bossHitsRequired = 3;
         let bossActive = false;
@@ -1462,15 +1462,15 @@
                     // Check if we should spawn double moles
                     if (endlessDoubleMoleChance > 0 && Math.random() < endlessDoubleMoleChance && available.length >= 2) {
                         const shuffled = available.sort(() => Math.random() - 0.5);
-                        const type = Math.random() < 0.08 ? 'golden' : 'normal';
+                        const type = Math.random() < 0.30 ? 'golden' : 'normal';
                         showMole(shuffled[0], type);
                         showMole(shuffled[1], type);
                     } else if (available.length > 0) {
                         const holeIndex = available[Math.floor(Math.random() * available.length)];
                         const rand = Math.random();
-                        if (rand < 0.08) {
+                        if (rand < 0.30) {
                             showMole(holeIndex, 'golden');
-                        } else if (rand < 0.16) {
+                        } else if (rand < 0.38) {
                             showMole(holeIndex, 'bomb');
                         } else {
                             showMole(holeIndex, 'normal');
@@ -1799,6 +1799,7 @@
 
             const bossGroup = new THREE.Group();
             bossGroup.userData.isBoss = true;
+            bossGroup.scale.set(3, 3, 3); // 3x size as per v1 spec
 
             // Boss body - giant hand
             const handGeo = new THREE.BoxGeometry(1.5, 2, 0.8);
@@ -2601,6 +2602,22 @@
         window.addEventListener('mouseup', onMouseUp);
         window.addEventListener('click', onClick);
 
+        // ============ KEYBOARD SKILLS (D/F/S) ============
+        window.addEventListener('keydown', (e) => {
+            if (!gameRunning || gamePaused) return;
+            const key = e.key.toUpperCase();
+            if (key === 'D' && !doubleScoreActive) {
+                activatePowerup('double');
+                showScorePopup(window.innerWidth / 2, window.innerHeight / 2 - 100, '双倍得分启动！', '#ffd700');
+            } else if (key === 'F' && !freezeActive) {
+                activatePowerup('freeze');
+                showScorePopup(window.innerWidth / 2, window.innerHeight / 2 - 100, '冰冻启动！', '#4ecdc4');
+            } else if (key === 'S' && !fireShieldActive) {
+                activatePowerup('fireShield');
+                showScorePopup(window.innerWidth / 2, window.innerHeight / 2 - 100, '护盾启动！', '#ff4500');
+            }
+        });
+
         // Pause button
         document.getElementById('pause-btn').addEventListener('click', togglePause);
         document.getElementById('resume-btn').addEventListener('click', togglePause);
@@ -2744,15 +2761,15 @@
                         // Normal spawning based on world
                         if (worldIdx === 3) {
                             // Lava world - more fire moles
-                            if (rand < 0.12) showMole(holeIndex, 'golden');
-                            else if (rand < 0.20) showMole(holeIndex, 'bomb');
+                            if (rand < 0.30) showMole(holeIndex, 'golden');
+                            else if (rand < 0.38) showMole(holeIndex, 'bomb');
                             else if (rand < 0.23) showMole(holeIndex, 'fire');
                             else if (rand < 0.26) showPowerup(holeIndex, 'fireShield');
                             else if (rand < 0.28) showPowerup(holeIndex, 'lavaFreeze');
                             else showMole(holeIndex, 'normal');
                         } else {
-                            if (rand < 0.08) showMole(holeIndex, 'golden');
-                            else if (rand < 0.16) showMole(holeIndex, 'bomb');
+                            if (rand < 0.30) showMole(holeIndex, 'golden');
+                            else if (rand < 0.38) showMole(holeIndex, 'bomb');
                             else if (rand < 0.19) showPowerup(holeIndex, 'double');
                             else if (rand < 0.22) showPowerup(holeIndex, 'freeze');
                             else showMole(holeIndex, 'normal');
@@ -2828,10 +2845,10 @@
             
             setWorldTheme(worldIdx);
             
-            // Boss settings
+            // Boss settings - 100 HP as per v1 spec
             const data = getSaveData();
-            bossHP = data.bossHP > 0 ? data.bossHP : 10;
-            bossMaxHP = 10;
+            bossHP = data.bossHP > 0 ? data.bossHP : 100;
+            bossMaxHP = 100;
             bossHitCount = 0;
             bossActive = false;
             
