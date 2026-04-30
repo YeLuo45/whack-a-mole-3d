@@ -596,8 +596,12 @@
         <div id="high-score-badge">最高分: <span id="high-score-val">0</span></div>
         <button class="btn" id="start-btn">开始游戏</button>
         <button class="btn btn-secondary btn-small" id="world-btn">选择关卡</button>
+        <button class="btn btn-secondary btn-small" id="endless-btn" style="background: linear-gradient(180deg, #ff4500 0%, #cc3700 100%); margin-top: 8px;">♾️ 无尽模式</button>
         <div style="margin-top: 15px;">
             <button class="btn btn-small" id="sound-toggle-btn" style="background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);">🔊 音效开</button>
+        </div>
+        <div style="margin-top: 15px;">
+            <button class="btn btn-small" id="achievement-btn" style="background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%); color: #8b6914;">🏆 成就</button>
         </div>
         <p class="instructions">普通地鼠 +10分 | 金色地鼠 +50分 | 炸弹 -20分<br>快速连击获得分数加成！</p>
     </div>
@@ -688,7 +692,7 @@
 
     <div id="achievement-screen">
         <h2>🏆 成就</h2>
-        <div id="achievement-progress">已解锁: <span id="achievement-unlocked-count">0</span>/16</div>
+        <div id="achievement-progress">已解锁: <span id="achievement-unlocked-count">0</span>/13</div>
         <div id="achievement-list"></div>
         <button class="btn" id="back-from-achievements">返回</button>
     </div>
@@ -759,6 +763,22 @@
             return audioCtx;
         }
         
+        function playBeatSound(comboCount = 0) {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                const baseFreq = Math.min(200 + comboCount * 50, 800);
+                osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
+            } catch(e) {}
+        }
+
         function playWhackSound() {
             if (!soundEnabled) return;
             try {
@@ -972,7 +992,6 @@
         
         // Vibration feedback (PRD 3)
         function vibrate(duration) {
-            if (!soundEnabled) return;
             try {
                 if (navigator.vibrate) {
                     navigator.vibrate(duration);
@@ -1115,16 +1134,16 @@
             { id: 'combo_5', name: '连击达人', desc: '单局达成5连击', icon: '🔥', reward: 30, condition: (s) => s.maxCombo >= 5 },
             { id: 'combo_10', name: '超级连击', desc: '单局达成10连击', icon: '⚡', reward: 100, condition: (s) => s.maxCombo >= 10 },
             { id: 'score_500', name: '火力全开', desc: '单局分数超过500', icon: '💥', reward: 50, condition: (s) => s.maxScore >= 500 },
-            { id: 'perfect', name: '精准打击', desc: '单局命中率100%', icon: '🎯', reward: 200, condition: (s) => s.perfectRounds >= 1 },
+            { id: 'perfect_100', name: '精准打击', desc: '单局命中率100%', icon: '🎯', reward: 200, condition: (s) => s.perfectRounds >= 1 },
             // 收集成就
-            { id: 'mole_collector', name: '收藏家', desc: '拥有3个地鼠皮肤', icon: '🐹', reward: 100, condition: (s) => s.moleSkins >= 3 },
-            { id: 'hammer_collector', name: '锤子收藏家', desc: '拥有2个锤子皮肤', icon: '🔨', reward: 100, condition: (s) => s.hammerSkins >= 2 },
+            { id: 'skin_mole_3', name: '收藏家', desc: '拥有3个地鼠皮肤', icon: '🐹', reward: 100, condition: (s) => s.moleSkins >= 3 },
+            { id: 'skin_hammer_2', name: '锤子收藏家', desc: '拥有2个锤子皮肤', icon: '🔨', reward: 100, condition: (s) => s.hammerSkins >= 2 },
             { id: 'streak_7', name: '签到一周', desc: '连续签到7天', icon: '📅', reward: 150, condition: (s) => s.loginStreak >= 7 },
             // 模式成就
             { id: 'endless_1000', name: '无尽探索', desc: '无尽模式分数超过1000', icon: '♾️', reward: 200, condition: (s) => (s.endlessHighScores && s.endlessHighScores[0] >= 1000) },
             { id: 'endless_3000', name: '无尽狂热', desc: '无尽模式分数超过3000', icon: '🌟', reward: 500, condition: (s) => (s.endlessHighScores && s.endlessHighScores[0] >= 3000) },
             { id: 'boss_killer', name: 'Boss克星', desc: '击败火焰巨人Boss', icon: '👹', reward: 300, condition: (s) => s.bossDefeated },
-            { id: 'world_conqueror', name: '世界征服', desc: '通关所有40关', icon: '🏰', reward: 500, condition: (s) => s.levelsCompleted >= 40 },
+            { id: 'world_conquer', name: '世界征服', desc: '通关所有40关', icon: '🏰', reward: 500, condition: (s) => s.levelsCompleted >= 40 },
         ];
 
         // Achievement state helpers
@@ -2444,11 +2463,11 @@
                 showHitEffect(x, y, '#ffd700');
                 showScorePopup(x, y, '+' + pts, '#ffd700');
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xffd700, 20);
-                playWhackSound();
+                playBeatSound(combo + 1);
                 setMoleHitExpression(moleData.mesh, type);
             } else if (type === 'fire') {
                 // Fire mole - part of boss battle interference
-                playWhackSound();
+                playBeatSound(combo + 1);
                 combo++;
                 lastHitTime = Date.now();
                 comboTimer = 0;
@@ -2462,7 +2481,7 @@
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 15);
                 setMoleHitExpression(moleData.mesh, type);
             } else {
-                playWhackSound();
+                playBeatSound(combo + 1);
                 combo++;
                 lastHitTime = Date.now();
                 comboTimer = 0;
