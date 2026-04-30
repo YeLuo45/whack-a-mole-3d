@@ -2674,9 +2674,9 @@
         window.addEventListener('click', onClick);
 
         // Pause button
-        document.getElementById('pause-btn').addEventListener('click', togglePause);
-        document.getElementById('resume-btn').addEventListener('click', togglePause);
-        document.getElementById('quit-btn').addEventListener('click', goToStart);
+        document.getElementById('pause-btn')?.addEventListener('click', togglePause);
+        document.getElementById('resume-btn')?.addEventListener('click', togglePause);
+        document.getElementById('quit-btn')?.addEventListener('click', goToStart);
 
         function togglePause() {
             if (!gameRunning) return;
@@ -2787,14 +2787,14 @@
             }
         }
 
-        document.getElementById('back-to-start').addEventListener('click', () => {
+        document.getElementById('back-to-start')?.addEventListener('click', () => {
             playClickSound();
             document.getElementById('world-select-screen').style.display = 'none';
             document.getElementById('start-screen').style.display = 'flex';
         });
 
-        document.getElementById('world-btn').addEventListener('click', () => { playClickSound(); showWorldSelect(); });
-        document.getElementById('world-select-btn').addEventListener('click', () => { playClickSound(); showWorldSelect(); });
+        document.getElementById('world-btn')?.addEventListener('click', () => { playClickSound(); showWorldSelect(); });
+        document.getElementById('world-select-btn')?.addEventListener('click', () => { playClickSound(); showWorldSelect(); });
 
         // ============ GAME LOOP ============
         let lastSpawnTime = 0;
@@ -3022,7 +3022,6 @@
             }
 
             // Update persistent stats
-            data = getSaveData();
             if (finalScore > (data.maxScore || 0)) {
                 data.maxScore = finalScore;
             }
@@ -3103,7 +3102,7 @@
         }
 
         // Next level button
-        document.getElementById('next-level-btn').addEventListener('click', () => {
+        document.getElementById('next-level-btn')?.addEventListener('click', () => {
             playClickSound();
             document.getElementById('level-clear-overlay').style.display = 'none';
             const nextLevel = currentLevel + 1;
@@ -3112,14 +3111,14 @@
             }
         });
 
-        document.getElementById('level-to-world-btn').addEventListener('click', () => {
+        document.getElementById('level-to-world-btn')?.addEventListener('click', () => {
             playClickSound();
             document.getElementById('level-clear-overlay').style.display = 'none';
             showWorldSelect();
         });
 
         // Boss buttons
-        document.getElementById('boss-next-btn').addEventListener('click', () => {
+        document.getElementById('boss-next-btn')?.addEventListener('click', () => {
             playClickSound();
             document.getElementById('boss-victory').style.display = 'none';
             // Continue to next world or replay
@@ -3130,7 +3129,7 @@
             }
         });
 
-        document.getElementById('boss-to-world-btn').addEventListener('click', () => {
+        document.getElementById('boss-to-world-btn')?.addEventListener('click', () => {
             playClickSound();
             document.getElementById('boss-victory').style.display = 'none';
             showWorldSelect();
@@ -3153,14 +3152,14 @@
         }
         updateSoundToggleUI();
         
-        document.getElementById('sound-toggle-btn').addEventListener('click', () => {
+        document.getElementById('sound-toggle-btn')?.addEventListener('click', () => {
             soundEnabled = !soundEnabled;
             saveSoundSetting();
             updateSoundToggleUI();
             if (soundEnabled) playClickSound();
         });
 
-        document.getElementById('start-btn').addEventListener('click', () => {
+        document.getElementById('start-btn')?.addEventListener('click', () => {
             playClickSound();
             // Start from first unlocked level
             const data = getSaveData();
@@ -3193,7 +3192,7 @@
             }
         });
 
-        document.getElementById('restart-btn').addEventListener('click', () => {
+        document.getElementById('restart-btn')?.addEventListener('click', () => {
             playClickSound();
             if (levelMode === 'boss') {
                 startBossLevel(currentWorld);
@@ -3204,20 +3203,20 @@
             }
         });
 
-        document.getElementById('home-btn').addEventListener('click', () => { playClickSound(); goToStart(); });
+        document.getElementById('home-btn')?.addEventListener('click', () => { playClickSound(); goToStart(); });
 
         // Endless mode button
-        document.getElementById('endless-btn').addEventListener('click', () => {
+        document.getElementById('endless-btn')?.addEventListener('click', () => {
             playClickSound();
             startEndlessMode();
         });
 
-        document.getElementById('endless-restart-btn').addEventListener('click', () => {
+        document.getElementById('endless-restart-btn')?.addEventListener('click', () => {
             playClickSound();
             startEndlessMode();
         });
 
-        document.getElementById('endless-home-btn').addEventListener('click', () => { playClickSound(); goToStart(); });
+        document.getElementById('endless-home-btn')?.addEventListener('click', () => { playClickSound(); goToStart(); });
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
