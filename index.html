@@ -1250,8 +1250,8 @@
             document.getElementById('achievement-unlocked-count').textContent = unlockedCount;
         }
 
-        document.getElementById('achievement-btn').addEventListener('click', showAchievementScreen);
-        document.getElementById('back-from-achievements').addEventListener('click', () => {
+        document.getElementById('achievement-btn')?.addEventListener('click', showAchievementScreen);
+        document.getElementById('back-from-achievements')?.addEventListener('click', () => {
             document.getElementById('achievement-screen').style.display = 'none';
             document.getElementById('start-screen').style.display = 'flex';
         });
