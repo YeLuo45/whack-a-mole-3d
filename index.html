@@ -3,33 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D 打地鼠 - V2</title>
+    <title>3D 打地鼠</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             overflow: hidden; 
-            background: linear-gradient(135deg, #1a472a 0%, #2d5a3f 50%, #1a472a 100%);
+            background: linear-gradient(135deg, #e8dcc8 0%, #f5f0e6 50%, #e8dcc8 100%);
             font-family: 'Segoe UI', sans-serif;
         }
-        #crosshair {
+        #info {
             position: fixed;
-            width: 40px; height: 40px;
-            pointer-events: none;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #8b6914;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
             z-index: 100;
-            transform: translate(-50%, -50%);
+            display: flex;
+            gap: 40px;
+        }
+        #info span { 
+            background: rgba(255,255,255,0.5);
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 2px solid rgba(139,105,20,0.3);
+        }
+        #score-display { color: #c44; }
+        #time-display { color: #5a7a5a; }
+        #combo-display { color: #ff8c00; display: none; }
+        #level-display { color: #8b6914; }
+
+        /* Boss HP Bar */
+        #boss-hp-container {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 24px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 12px;
+            border: 2px solid #ff4500;
+            overflow: hidden;
+            z-index: 100;
             display: none;
         }
-        #crosshair::before, #crosshair::after {
-            content: '';
-            position: absolute;
-            background: rgba(255,255,255,0.8);
+        #boss-hp-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4500, #ff8c00, #ffd700);
+            width: 100%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
         }
-        #crosshair::before { width: 2px; height: 100%; left: 50%; transform: translateX(-50%); }
-        #crosshair::after { width: 100%; height: 2px; top: 50%; transform: translateY(-50%); }
+        #boss-hp-text {
+            position: fixed;
+            top: 108px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            z-index: 100;
+            display: none;
+        }
+        #boss-hit-counter {
+            position: fixed;
+            top: 130px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff8c00;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            z-index: 100;
+            display: none;
+        }
+
+        /* Pause button */
+        #pause-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.7);
+            border: 2px solid rgba(139,105,20,0.3);
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 100;
+            display: none;
+            font-size: 20px;
+            color: #8b6914;
+            transition: transform 0.1s;
+        }
+        #pause-btn:hover { transform: scale(1.1); }
+
+        /* Combo bar */
+        #combo-bar-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            overflow: hidden;
+            z-index: 100;
+            display: none;
+        }
+        #combo-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff8c00, #ffd700);
+            width: 100%;
+            transition: width 0.1s linear;
+            border-radius: 6px;
+        }
+
+        /* Power-up indicators */
+        #powerup-indicator {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+        .powerup-badge {
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 14px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .powerup-badge.active { opacity: 1; }
+        .powerup-double { background: #ffd700; color: #8b6914; }
+        .powerup-freeze { background: #4ecdc4; color: #fff; }
+        .powerup-shield { background: #ff4500; color: #fff; }
+
+        /* World/Level Selection */
+        #world-select-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(245,240,230,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        #world-select-screen h2 { color: #8b6914; font-size: 36px; margin-bottom: 20px; }
+        .world-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 900px;
+        }
+        .world-box {
+            width: 180px;
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 3px solid transparent;
+        }
+        .world-box:hover:not(.locked) { transform: scale(1.05); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
+        .world-box.selected { border-color: #ffd700; }
+        .world-box.locked { opacity: 0.5; cursor: not-allowed; }
+        .world-box h3 { color: #fff; margin-bottom: 10px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
+        .world-box .levels {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .level-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #fff;
+            font-weight: bold;
+            margin: 0 auto;
+        }
+        .level-dot.completed { background: #ffd700; color: #8b6914; }
+        .level-dot.current { background: #4CAF50; }
+        .level-dot.locked { background: #999; }
+        .world-forest { background: linear-gradient(180deg, #2d5a2d, #1a3d1a); }
+        .world-mountain { background: linear-gradient(180deg, #5a4030, #3d2817); }
+        .world-ice { background: linear-gradient(180deg, #4a7a9a, #1a3a4a); }
+        .world-lava { background: linear-gradient(180deg, #8b2500, #4a0a0a); }
+
+        /* Screens */
+        #start-screen, #game-over-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(245,240,230,0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        #game-over-screen { display: none; }
+        h1 { color: #8b6914; font-size: 56px; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(139,105,20,0.2); }
+        h2 { color: #c44; font-size: 42px; margin-bottom: 20px; }
+        .subtitle { color: #888; font-size: 20px; margin-bottom: 40px; }
+        .btn {
+            background: linear-gradient(180deg, #8b6914 0%, #6b4e0a 100%);
+            color: #fff;
+            border: none;
+            padding: 18px 50px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            box-shadow: 0 6px 20px rgba(139,105,20,0.4);
+        }
+        .btn:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(139,105,20,0.6); }
+        .btn:active { transform: scale(0.98); }
+        .btn-small {
+            padding: 12px 30px;
+            font-size: 18px;
+            margin: 5px;
+        }
+        .btn-secondary {
+            background: linear-gradient(180deg, #5a5a5a 0%, #3a3a3a 100%);
+        }
+        #final-score { color: #8b6914; font-size: 64px; margin: 10px 0; }
+        .instructions { color: #888; font-size: 16px; margin-top: 30px; max-width: 400px; text-align: center; line-height: 1.6; }
+
+        /* Stats display */
+        #stats-display {
+            display: flex;
+            gap: 30px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 10px 20px;
+            background: rgba(139,105,20,0.1);
+            border-radius: 15px;
+        }
+        .stat-value { font-size: 32px; font-weight: bold; color: #8b6914; }
+        .stat-label { font-size: 14px; color: #888; margin-top: 5px; }
+        #high-score-badge {
+            background: linear-gradient(180deg, #ffd700, #ff8c00);
+            color: #8b6914;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        /* Pause overlay */
+        #pause-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 250;
+        }
+        #pause-overlay h2 { color: #ffd700; font-size: 64px; }
+        #pause-overlay .btn { margin: 10px; }
+
+        /* Level clear overlay */
+        #level-clear-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+        }
+        #level-clear-overlay h2 { color: #ffd700; font-size: 48px; }
+        #level-stars { font-size: 64px; margin: 20px 0; }
+        #level-score { color: #fff; font-size: 24px; margin-bottom: 20px; }
+
+        /* Crosshair */
+        #crosshair {
+            position: fixed;
+            width: 32px; height: 32px;
+            pointer-events: none;
+            z-index: 2147483647;
+            transform: translate(-50%, -50%);
+            display: none;
+            background-color: transparent;
+            background-image:
+              radial-gradient(circle, #ff3333 3px, transparent 3px),
+              linear-gradient(#ffffff 1px, transparent 1px),
+              linear-gradient(90deg, #ffffff 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 100% 100%;
+            background-position: center, center, center;
+            background-repeat: no-repeat;
+            box-shadow: 0 0 4px rgba(0,0,0,0.5);
+        }
+        #crosshair.slam { transform: translate(-50%, -50%) rotate(25deg) scale(1.2); }
         .hit-effect {
             position: fixed;
             width: 60px; height: 60px;
-            border: 4px solid #ff6b6b;
+            border: 4px solid #c44;
             border-radius: 50%;
             pointer-events: none;
             animation: hitRing 0.4s ease-out forwards;
@@ -39,42 +334,172 @@
             0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
             100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
         }
-        #ui-canvas {
+        #praise-popup {
             position: fixed;
-            top: 0; left: 0;
-            z-index: 50;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 48px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            z-index: 300;
             pointer-events: none;
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
         }
-        .btn {
-            background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
-            color: #1a472a;
-            border: none;
-            padding: 18px 50px;
+        #praise-popup.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        #praise-popup.hide { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
+        #combo-break {
+            position: fixed;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: bold;
+            color: #c44;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 250;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        #combo-break.show { opacity: 1; }
+        #combo-break.hide { opacity: 0; }
+        .score-popup {
+            position: fixed;
             font-size: 24px;
             font-weight: bold;
-            border-radius: 30px;
-            cursor: pointer;
-            transition: transform 0.1s, box-shadow 0.1s;
-            box-shadow: 0 6px 20px rgba(255,215,0,0.4);
-            pointer-events: auto;
-        }
-        .btn:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(255,215,0,0.6); }
-        .btn:active { transform: scale(0.98); }
-        .btn-small {
-            padding: 10px 25px;
-            font-size: 16px;
-            border-radius: 20px;
-        }
-        .btn-disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
             pointer-events: none;
+            animation: scoreFloat 0.8s ease-out forwards;
+            z-index: 200;
+        }
+        @keyframes scoreFloat {
+            0% { transform: translate(-50%, 0); opacity: 1; }
+            100% { transform: translate(-50%, -60px); opacity: 0; }
+        }
+
+        /* Boss victory */
+        #boss-victory {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 400;
+        }
+        #boss-victory h2 { color: #ffd700; font-size: 56px; margin-bottom: 20px; }
+        #boss-victory .subtitle { color: #ff8c00; font-size: 24px; margin-bottom: 30px; }
+        .firework {
+            position: fixed;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: firework 1s ease-out forwards;
+            z-index: 450;
+        }
+        @keyframes firework {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(3); opacity: 0.8; }
+            100% { transform: scale(5); opacity: 0; }
         }
     </style>
 </head>
 <body>
-    <canvas id="ui-canvas"></canvas>
     <div id="crosshair"></div>
+    <div id="praise-popup"></div>
+    <div id="combo-break">连击中断！</div>
+    <div id="pause-overlay">
+        <h2>游戏暂停</h2>
+        <button class="btn" id="resume-btn">继续游戏</button>
+        <button class="btn btn-small" id="quit-btn">返回主页</button>
+    </div>
+
+    <div id="boss-hp-container">
+        <div id="boss-hp-bar"></div>
+    </div>
+    <div id="boss-hp-text">Boss: <span id="boss-hp-val">10</span>/10</div>
+    <div id="boss-hit-counter">连续击中: <span id="boss-hit-val">0</span>/3</div>
+    
+    <div id="info">
+        <span>关卡: <b id="level-display">1</b></span>
+        <span>得分: <b id="score-display">0</b></span>
+        <span>时间: <b id="time-display">30</b>s</span>
+        <span id="combo-display">连击: <b id="combo-count">0</b></span>
+    </div>
+
+    <button id="pause-btn">⏸</button>
+
+    <div id="powerup-indicator">
+        <span class="powerup-badge powerup-double" id="badge-double">2倍得分</span>
+        <span class="powerup-badge powerup-freeze" id="badge-freeze">冻结</span>
+        <span class="powerup-badge powerup-shield" id="badge-shield">火焰护盾</span>
+    </div>
+
+    <div id="combo-bar-container">
+        <div id="combo-bar"></div>
+    </div>
+
+    <div id="start-screen">
+        <h1>3D 打地鼠</h1>
+        <p class="subtitle">考验你的反应速度！</p>
+        <div id="high-score-badge">最高分: <span id="high-score-val">0</span></div>
+        <button class="btn" id="start-btn">开始游戏</button>
+        <button class="btn btn-secondary btn-small" id="world-btn">选择关卡</button>
+        <p class="instructions">普通地鼠 +10分 | 金色地鼠 +50分 | 炸弹 -20分<br>快速连击获得分数加成！</p>
+    </div>
+
+    <div id="world-select-screen">
+        <h2>选择关卡</h2>
+        <div class="world-container" id="world-container"></div>
+        <button class="btn btn-small" id="back-to-start" style="margin-top:20px">返回</button>
+    </div>
+
+    <div id="game-over-screen">
+        <h2>时间到！</h2>
+        <div id="final-score">0</div>
+        <div id="stats-display">
+            <div class="stat-item">
+                <div class="stat-value" id="stat-accuracy">0%</div>
+                <div class="stat-label">命中率</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-combo">0</div>
+                <div class="stat-label">最高连击</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-hits">0</div>
+                <div class="stat-label">击中次数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-time">0s</div>
+                <div class="stat-label">有效游戏时间</div>
+            </div>
+        </div>
+        <div id="high-score-badge-end" style="display:none; background: linear-gradient(180deg, #ffd700, #ff8c00); color: #8b6914; padding: 8px 20px; border-radius: 20px; font-size: 18px; font-weight: bold; margin-bottom: 10px;">新纪录！</div>
+        <button class="btn" id="restart-btn">再来一局</button>
+        <button class="btn btn-small" id="home-btn">返回主页</button>
+        <button class="btn btn-small" id="world-select-btn">选择关卡</button>
+    </div>
+
+    <div id="level-clear-overlay">
+        <h2 id="level-clear-title">关卡通过！</h2>
+        <div id="level-stars"></div>
+        <div id="level-score">得分: <span id="level-final-score">0</span></div>
+        <button class="btn" id="next-level-btn">下一关</button>
+        <button class="btn btn-small" id="level-to-world-btn">返回选关</button>
+    </div>
+
+    <div id="boss-victory">
+        <h2>🎉 Boss击败！ 🎉</h2>
+        <div class="subtitle">火焰巨人已被击败！</div>
+        <div id="level-stars"></div>
+        <div id="level-score">得分: <span id="boss-final-score">0</span></div>
+        <button class="btn" id="boss-next-btn">继续挑战</button>
+        <button class="btn btn-small" id="boss-to-world-btn">返回选关</button>
+    </div>
 
     <script type="importmap">
     {
@@ -87,714 +512,403 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // ==================== GAME DATA & STATE ====================
-        const SAVE_KEY = 'whackamole_v2_save';
-        const WORLDS = ['森林', '矿山', '冰原'];
-        const WORLD_THEMES = [
-            { bg: 0x1a472a, ground: 0x3d7a4a, fog: 0x1a472a },
-            { bg: 0x3d2817, ground: 0x5a4030, fog: 0x3d2817 },
-            { bg: 0x1a3a4a, ground: 0x3a6080, fog: 0x1a3a4a }
-        ];
+        // ============ GAME CONSTANTS ============
+        const WORLDS = ['森林', '矿山', '冰原', '熔岩'];
         const LEVELS_PER_WORLD = 10;
-        const STAR_THRESHOLDS = [500, 1000, 2000];
+        const TOTAL_WORLDS = 4;
         
-        const MOLE_SKINS = ['普通', '工程师', '僵尸', '恐龙', '机甲'];
-        const HAMMER_SKINS = ['木', '金', '火', '雷电'];
-        const MOLE_SKIN_COLORS = [
-            { body: 0x8B6914, head: 0x8B6914 },  // 普通
-            { body: 0x888888, head: 0x666666 },  // 工程师
-            { body: 0x556B2F, head: 0x6B8E23 },  // 僵尸
-            { body: 0x228B22, head: 0x32CD32 },  // 恐龙
-            { body: 0x4A4A4A, head: 0x696969 }   // 机甲
+        // World themes [bg, ground, fog, hole rim, hole inner]
+        const WORLD_THEMES = [
+            { bg: 0xf0e6d2, ground: 0xd4c4a8, fog: 0xf0e6d2, holeRim: 0x5a4a3a, holeInner: 0x3a2a1a, name: 'world-forest' },
+            { bg: 0x3d2817, ground: 0x5a4030, fog: 0x3d2817, holeRim: 0x4a3a2a, holeInner: 0x2a1a0a, name: 'world-mountain' },
+            { bg: 0x1a3a4a, ground: 0x3a6080, fog: 0x1a3a4a, holeRim: 0x6080a0, holeInner: 0x1a2a3a, name: 'world-ice' },
+            { bg: 0x2a0a0a, ground: 0x4a1a0a, fog: 0x2a0a0a, holeRim: 0xff4500, holeInner: 0x3a0a0a, name: 'world-lava' }
         ];
-        const HAMMER_COLORS = [0x8B4513, 0xFFD700, 0xFF4500, 0x9370DB];
-        
-        const SHOP_ITEMS = {
-            passive: [
-                { id: 'speed', name: '攻速+5%', desc: '地鼠冒出速度+5%', cost: 500, maxLevel: 10, icon: '⚡' },
-                { id: 'life', name: '额外生命+1', desc: '初始生命+1', cost: 800, maxLevel: 3, icon: '❤' },
-                { id: 'vision', name: '视野扩大+10%', desc: '视野范围+10%', cost: 600, maxLevel: 5, icon: '👁' }
-            ],
-            moleSkins: [
-                { id: 'skin_engineer', name: '工程师地鼠', cost: 1000, skinIndex: 1 },
-                { id: 'skin_zombie', name: '僵尸地鼠', cost: 1500, skinIndex: 2 },
-                { id: 'skin_dino', name: '恐龙地鼠', cost: 2000, skinIndex: 3 },
-                { id: 'skin_mech', name: '机甲地鼠', cost: 3000, skinIndex: 4 }
-            ],
-            hammerSkins: [
-                { id: 'hammer_gold', name: '黄金锤子', cost: 1200, skinIndex: 1 },
-                { id: 'hammer_fire', name: '烈焰锤子', cost: 1800, skinIndex: 2 },
-                { id: 'hammer_thunder', name: '雷电锤子', cost: 2500, skinIndex: 3 }
-            ]
+
+        // New items for World 4
+        const ITEMS = {
+            FIRE_SHIELD: { id: 'fireShield', name: '火焰护盾', desc: '抵挡1次失误', probability: 0.03, color: 0xff4500 },
+            LAVA_FREEZE: { id: 'lavaFreeze', name: '熔岩冻结', desc: '冻结5秒', probability: 0.02, color: 0x4ecdc4 }
         };
 
-        let defaultSave = () => ({
-            coins: 0,
-            stamina: 10,
-            staminaTime: Date.now(),
-            levels: Array(3).fill(null).map(() => Array(10).fill(0)),
-            unlockedWorlds: [true, false, false],
-            passiveLevels: { speed: 0, life: 0, vision: 0 },
-            ownedMoleSkins: [true, false, false, false, false],
-            ownedHammerSkins: [true, false, false, false],
-            equippedMoleSkin: 0,
-            equippedHammerSkin: 0,
-            settings: { sound: true }
-        });
+        // Level configs: [baseSpawnInterval, moleDuration (frames at 60fps), scoreThreshold]
+        function getLevelConfig(worldIdx, levelIdx) {
+            const baseInterval = 1200;
+            const baseDuration = 60;
+            const baseThreshold = 500;
+            
+            const speedBonus = (worldIdx * 10 + levelIdx) * 0.08; // +8% per level
+            const thresholdBonus = (worldIdx * 10 + levelIdx) * 0.15; // +15% per level
+            
+            return {
+                spawnInterval: Math.max(600, baseInterval * (1 - speedBonus)),
+                moleDuration: Math.max(30, baseDuration * (1 - speedBonus * 0.5)),
+                scoreThreshold: Math.floor(baseThreshold * (1 + thresholdBonus)),
+                timeLimit: 30 + levelIdx * 2 // +2s per level within world
+            };
+        }
 
-        let gameData = loadGame();
+        // ============ AUDIO SYSTEM ============
+        let audioCtx = null;
+        function getAudioCtx() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return audioCtx;
+        }
 
-        function loadGame() {
+        function playWhackSound() {
             try {
-                let data = JSON.parse(localStorage.getItem(SAVE_KEY));
-                if (!data) data = defaultSave();
-                // Ensure all fields exist
-                let fresh = defaultSave();
-                for (let k in fresh) if (data[k] === undefined) data[k] = fresh[k];
-                return data;
-            } catch { return defaultSave(); }
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.setValueAtTime(200, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
+            } catch(e) {}
         }
 
-        function saveGame() {
-            gameData.staminaTime = Date.now();
-            localStorage.setItem(SAVE_KEY, JSON.stringify(gameData));
+        function playBombSound() {
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.5, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3);
+            } catch(e) {}
         }
 
-        function getStamina() {
-            let s = gameData.stamina;
-            let elapsed = (Date.now() - gameData.staminaTime) / 1000;
-            let recovered = Math.floor(elapsed / 300);
-            return Math.min(10, s + recovered);
-        }
-
-        function useStamina() {
-            let s = getStamina();
-            if (s <= 0) return false;
-            gameData.stamina = s - 1;
-            saveGame();
-            return true;
-        }
-
-        function getEquippedMoleSkin() { return gameData.equippedMoleSkin; }
-        function getEquippedHammerSkin() { return gameData.equippedHammerSkin; }
-        function getPassiveSpeedBonus() { return 1 + gameData.passiveLevels.speed * 0.05; }
-        function getPassiveLifeBonus() { return gameData.passiveLevels.life; }
-        function getPassiveVisionBonus() { return 1 + gameData.passiveLevels.vision * 0.1; }
-
-        // ==================== UI SYSTEM ====================
-        const canvas = document.getElementById('ui-canvas');
-        const ctx = canvas.getContext('2d');
-        let uiButtons = [];
-        let currentScreen = 'menu';
-        let selectedLevel = null;
-        let selectedWorld = 0;
-        let selectedInstantItem = null;
-        let shopTab = 'passive';
-        let gachaAnimating = false;
-        let gachaResult = [];
-
-        function resizeUI() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeUI);
-        resizeUI();
-
-        function isPointInButton(px, py, btn) {
-            return px >= btn.x && px <= btn.x + btn.w && py >= btn.y && py <= btn.y + btn.h;
-        }
-
-        function addButton(x, y, w, h, label, action, style = 'normal', color = '#ffd700') {
-            uiButtons.push({ x, y, w, h, label, action, style, color });
-        }
-
-        function clearButtons() { uiButtons = []; }
-
-        function drawButton(btn, hovered) {
-            ctx.save();
-            let scale = hovered ? 1.02 : 1;
-            let cx = btn.x + btn.w / 2, cy = btn.y + btn.h / 2;
-            ctx.translate(cx, cy);
-            ctx.scale(scale, scale);
-            ctx.translate(-cx, -cy);
-
-            let gradient = ctx.createLinearGradient(btn.x, btn.y, btn.x, btn.y + btn.h);
-            if (btn.style === 'disabled') {
-                gradient.addColorStop(0, '#666');
-                gradient.addColorStop(1, '#444');
-            } else if (btn.style === 'danger') {
-                gradient.addColorStop(0, '#ff6b6b');
-                gradient.addColorStop(1, '#c44');
-            } else if (btn.style === 'success') {
-                gradient.addColorStop(0, '#4ecdc4');
-                gradient.addColorStop(1, '#2a9d8f');
-            } else {
-                gradient.addColorStop(0, btn.color);
-                gradient.addColorStop(1, shadeColor(btn.color, -30));
-            }
-            
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 12);
-            ctx.fill();
-            
-            ctx.shadowColor = 'rgba(0,0,0,0.3)';
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetY = 4;
-            
-            ctx.fillStyle = btn.style === 'disabled' ? '#999' : (btn.style === 'success' ? '#fff' : '#1a472a');
-            ctx.font = `bold ${Math.min(20, btn.w / 8)}px Segoe UI`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
-            ctx.restore();
-        }
-
-        function shadeColor(color, percent) {
-            let num = parseInt(color.replace('#', ''), 16);
-            let amt = Math.round(2.55 * percent);
-            let R = Math.min(255, Math.max(0, (num >> 16) + amt));
-            let G = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amt));
-            let B = Math.min(255, Math.max(0, (num & 0x0000FF) + amt));
-            return `rgb(${R},${G},${B})`;
-        }
-
-        function drawStar(x, y, size, filled) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.beginPath();
-            for (let i = 0; i < 5; i++) {
-                let angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-                let r = i % 2 === 0 ? size : size / 2;
-                if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
-                else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-            }
-            ctx.closePath();
-            ctx.fillStyle = filled ? '#ffd700' : '#555';
-            ctx.fill();
-            if (filled) {
-                ctx.strokeStyle = '#ff8c00';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-            ctx.restore();
-        }
-
-        function drawStars(x, y, count, size = 15) {
-            for (let i = 0; i < 3; i++) {
-                drawStar(x + i * size * 2, y, size, i < count);
-            }
-        }
-
-        // ==================== MENU SCREEN ====================
-        function drawMenuScreen() {
-            clearButtons();
-            ctx.fillStyle = 'rgba(0,0,0,0.85)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            let cx = canvas.width / 2;
-            
-            // Title
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 56px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.fillText('3D 打地鼠', cx, 120);
-            
-            ctx.fillStyle = '#aaa';
-            ctx.font = '20px Segoe UI';
-            ctx.fillText('V2 进度版', cx, 170);
-
-            // Coins & Stamina
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 22px Segoe UI';
-            ctx.fillText(`💰 ${gameData.coins}`, cx - 100, 220);
-            ctx.fillStyle = '#4ecdc4';
-            ctx.fillText(`⚡ ${getStamina()}/10`, cx + 100, 220);
-
-            // Buttons
-            let btnW = 250, btnH = 60, startY = 280;
-            addButton(cx - btnW/2, startY, btnW, btnH, '🎮 开始游戏', () => { currentScreen = 'modeSelect'; });
-            addButton(cx - btnW/2, startY + 80, btnW, btnH, '📋 关卡选择', () => { currentScreen = 'levelSelect'; selectedWorld = 0; });
-            addButton(cx - btnW/2, startY + 160, btnW, btnH, '🛒 商店', () => { currentScreen = 'shop'; shopTab = 'passive'; });
-            addButton(cx - btnW/2, startY + 240, btnW, btnH, '🎁 收藏', () => { currentScreen = 'collection'; });
-
-            // Draw buttons
-            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
-        }
-
-        // ==================== MODE SELECT SCREEN ====================
-        function drawModeSelectScreen() {
-            clearButtons();
-            ctx.fillStyle = 'rgba(0,0,0,0.85)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            let cx = canvas.width / 2;
-            
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 42px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.fillText('选择模式', cx, 100);
-
-            // Check stamina for classic
-            let staminaOK = getStamina() > 0;
-            let btnW = 300, btnH = 80, startY = 200;
-            
-            addButton(cx - btnW/2, startY, btnW, btnH, '🏆 经典模式', () => { 
-                if (useStamina()) { currentScreen = 'playing'; gameMode = 'classic'; startClassicGame(); }
-            }, staminaOK ? 'normal' : 'disabled');
-            
-            addButton(cx - btnW/2, startY + 100, btnW, btnH, '📍 关卡模式', () => { 
-                if (useStamina()) { currentScreen = 'instantItemSelect'; }
-            }, staminaOK ? 'normal' : 'disabled');
-
-            // Show stamina warning
-            if (!staminaOK) {
-                ctx.fillStyle = '#ff6b6b';
-                ctx.font = '18px Segoe UI';
-                ctx.fillText('体力不足，请稍后再来', cx, startY + 210);
-            }
-
-            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'menu'; }, 'success');
-            
-            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
-        }
-
-        // ==================== INSTANT ITEM SELECT SCREEN ====================
-        const INSTANT_ITEMS = [
-            { id: 'slow', name: '减速手套', desc: '地鼠冒出速度-50%', icon: '🦾', cost: 0 },
-            { id: 'double', name: '双倍积分', desc: '得分×2', icon: '✌️', cost: 0 },
-            { id: 'super', name: '超级锤子', desc: '必定命中，5次', icon: '🔨', cost: 0 }
-        ];
-
-        function drawInstantItemSelectScreen() {
-            clearButtons();
-            ctx.fillStyle = 'rgba(0,0,0,0.85)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            let cx = canvas.width / 2;
-            
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 42px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.fillText('选择道具', cx, 80);
-            
-            ctx.fillStyle = '#aaa';
-            ctx.font = '16px Segoe UI';
-            ctx.fillText('（局前选择，局内使用）', cx, 115);
-
-            // Instant items
-            let itemY = 170;
-            INSTANT_ITEMS.forEach((item, i) => {
-                let selected = selectedInstantItem === item.id;
-                let btnW = 350, btnH = 70;
-                addButton(cx - btnW/2, itemY + i * 90, btnW, btnH, `${item.icon} ${item.name}`, () => {
-                    selectedInstantItem = selectedInstantItem === item.id ? null : item.id;
-                }, 'normal', selected ? '#4ecdc4' : '#ffd700');
-                
-                ctx.fillStyle = selected ? '#4ecdc4' : '#888';
-                ctx.font = '14px Segoe UI';
-                ctx.textAlign = 'center';
-                ctx.fillText(item.desc, cx, itemY + i * 90 + 45);
-            });
-
-            addButton(cx - 150, itemY + 300, 300, 60, '开始游戏', () => {
-                currentScreen = 'levelSelect';
-            });
-
-            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'modeSelect'; }, 'success');
-            
-            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
-        }
-
-        // ==================== LEVEL SELECT SCREEN ====================
-        function drawLevelSelectScreen() {
-            clearButtons();
-            ctx.fillStyle = 'rgba(0,0,0,0.85)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // World tabs
-            let tabY = 30;
-            let tabW = 120, tabH = 45;
-            for (let w = 0; w < 3; w++) {
-                let unlocked = gameData.unlockedWorlds[w];
-                let selected = selectedWorld === w;
-                addButton(50 + w * (tabW + 15), tabY, tabW, tabH, (unlocked ? '' : '🔒 ') + WORLDS[w], () => {
-                    if (unlocked) selectedWorld = w;
-                }, unlocked ? 'normal' : 'disabled', selected ? '#4ecdc4' : '#ffd700');
-            }
-
-            // Level grid
-            let gridStartX = 80, gridStartY = 120;
-            let cellW = 90, cellH = 100, gap = 15;
-            
-            for (let l = 0; l < 10; l++) {
-                let col = l % 5, row = Math.floor(l / 5);
-                let x = gridStartX + col * (cellW + gap);
-                let y = gridStartY + row * (cellH + gap);
-                let worldComplete = isWorldComplete(selectedWorld);
-                let levelUnlocked = isLevelUnlocked(selectedWorld, l);
-                let stars = gameData.levels[selectedWorld][l];
-                
-                let canPlay = levelUnlocked && getStamina() > 0;
-                addButton(x, y, cellW, cellH, levelUnlocked ? `${l + 1}关` : '🔒', () => {
-                    if (canPlay) {
-                        selectedLevel = { world: selectedWorld, level: l };
-                        currentScreen = 'playing';
-                        gameMode = 'level';
-                        startLevelGame(selectedWorld, l);
-                    }
-                }, canPlay ? 'normal' : 'disabled');
-                
-                if (levelUnlocked) {
-                    drawStars(x + cellW/2 - 22, y + cellH - 25, stars, 10);
-                }
-            }
-
-            // World info
-            ctx.fillStyle = '#aaa';
-            ctx.font = '16px Segoe UI';
-            ctx.textAlign = 'center';
-            let worldComplete2 = isWorldComplete(selectedWorld);
-            let nextUnlock = selectedWorld === 0 ? '矿山：森林10关全通' : (selectedWorld === 1 ? '冰原：矿山10关全通' : '已全部解锁');
-            ctx.fillText(nextUnlock, canvas.width / 2, 370);
-
-            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'instantItemSelect'; }, 'success');
-            
-            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
-        }
-
-        function isWorldComplete(world) {
-            return gameData.levels[world].every(s => s >= 1);
-        }
-
-        function isLevelUnlocked(world, level) {
-            if (world === 0) return level === 0 || gameData.levels[0][level - 1] >= 1;
-            if (world === 1) return gameData.unlockedWorlds[1] && (level === 0 || gameData.levels[1][level - 1] >= 1);
-            if (world === 2) return gameData.unlockedWorlds[2] && (level === 0 || gameData.levels[2][level - 1] >= 1);
-            return false;
-        }
-
-        // ==================== SHOP SCREEN ====================
-        function drawShopScreen() {
-            clearButtons();
-            ctx.fillStyle = 'rgba(0,0,0,0.85)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            let cx = canvas.width / 2;
-            
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 42px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.fillText('商店', cx, 50);
-            
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 20px Segoe UI';
-            ctx.fillText(`💰 ${gameData.coins}`, cx, 90);
-
-            // Tabs
-            let tabs = ['passive', 'mole', 'hammer', 'gacha'];
-            let tabLabels = ['被动道具', '地鼠皮肤', '锤子皮肤', '盲盒'];
-            let tabW = 100, tabH = 40, tabY = 120;
-            tabs.forEach((t, i) => {
-                addButton(50 + i * (tabW + 10), tabY, tabW, tabH, tabLabels[i], () => { shopTab = t; }, shopTab === t ? 'normal' : 'disabled', shopTab === t ? '#4ecdc4' : '#ffd700');
-            });
-
-            // Items
-            let itemY = 190;
-            ctx.textAlign = 'left';
-            
-            if (shopTab === 'passive') {
-                SHOP_ITEMS.passive.forEach((item, i) => {
-                    let currentLevel = gameData.passiveLevels[item.id];
-                    let maxed = currentLevel >= item.maxLevel;
-                    let cost = item.cost * (currentLevel + 1);
-                    
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 20px Segoe UI';
-                    ctx.fillText(`${item.icon} ${item.name}`, 80, itemY + i * 80);
-                    ctx.fillStyle = '#aaa';
-                    ctx.font = '14px Segoe UI';
-                    ctx.fillText(`${item.desc} (${currentLevel}/${item.maxLevel})`, 80, itemY + i * 80 + 25);
-                    
-                    let btnX = 500, btnW = 120;
-                    if (!maxed) {
-                        addButton(btnX, itemY + i * 80 - 15, btnW, 40, `💰 ${cost}`, () => {
-                            if (gameData.coins >= cost) {
-                                gameData.coins -= cost;
-                                gameData.passiveLevels[item.id]++;
-                                saveGame();
-                            }
-                        }, gameData.coins >= cost ? 'normal' : 'disabled');
-                    } else {
-                        ctx.fillStyle = '#4ecdc4';
-                        ctx.font = 'bold 16px Segoe UI';
-                        ctx.fillText('已满级', btnX + 40, itemY + i * 80);
-                    }
+        function playGoldenSound() {
+            try {
+                const ctx = getAudioCtx();
+                [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    const t = ctx.currentTime + i * 0.08;
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(0.25, t + 0.04);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+                    osc.start(t); osc.stop(t + 0.25);
                 });
-            } else if (shopTab === 'mole') {
-                SHOP_ITEMS.moleSkins.forEach((item, i) => {
-                    let owned = gameData.ownedMoleSkins[item.skinIndex];
-                    let equipped = gameData.equippedMoleSkin === item.skinIndex;
-                    
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 20px Segoe UI';
-                    ctx.fillText(`${item.name}`, 80, itemY + i * 70);
-                    
-                    let btnX = 500, btnW = 120;
-                    if (!owned) {
-                        addButton(btnX, itemY + i * 70 - 15, btnW, 40, `💰 ${item.cost}`, () => {
-                            if (gameData.coins >= item.cost) {
-                                gameData.coins -= item.cost;
-                                gameData.ownedMoleSkins[item.skinIndex] = true;
-                                saveGame();
-                            }
-                        }, gameData.coins >= item.cost ? 'normal' : 'disabled');
-                    } else if (!equipped) {
-                        addButton(btnX, itemY + i * 70 - 15, btnW, 40, '装备', () => {
-                            gameData.equippedMoleSkin = item.skinIndex;
-                            saveGame();
-                        }, 'normal', '#4ecdc4');
-                    } else {
-                        ctx.fillStyle = '#4ecdc4';
-                        ctx.font = 'bold 16px Segoe UI';
-                        ctx.fillText('已装备', btnX + 40, itemY + i * 70);
-                    }
+            } catch(e) {}
+        }
+
+        function playPowerupSound() {
+            try {
+                const ctx = getAudioCtx();
+                [400, 500, 600, 800].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    const t = ctx.currentTime + i * 0.06;
+                    gain.gain.setValueAtTime(0.2, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+                    osc.start(t); osc.stop(t + 0.15);
                 });
-            } else if (shopTab === 'hammer') {
-                SHOP_ITEMS.hammerSkins.forEach((item, i) => {
-                    let owned = gameData.ownedHammerSkins[item.skinIndex];
-                    let equipped = gameData.equippedHammerSkin === item.skinIndex;
-                    
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 20px Segoe UI';
-                    ctx.fillText(`${item.name}`, 80, itemY + i * 70);
-                    
-                    let btnX = 500, btnW = 120;
-                    if (!owned) {
-                        addButton(btnX, itemY + i * 70 - 15, btnW, 40, `💰 ${item.cost}`, () => {
-                            if (gameData.coins >= item.cost) {
-                                gameData.coins -= item.cost;
-                                gameData.ownedHammerSkins[item.skinIndex] = true;
-                                saveGame();
-                            }
-                        }, gameData.coins >= item.cost ? 'normal' : 'disabled');
-                    } else if (!equipped) {
-                        addButton(btnX, itemY + i * 70 - 15, btnW, 40, '装备', () => {
-                            gameData.equippedHammerSkin = item.skinIndex;
-                            saveGame();
-                        }, 'normal', '#4ecdc4');
-                    } else {
-                        ctx.fillStyle = '#4ecdc4';
-                        ctx.font = 'bold 16px Segoe UI';
-                        ctx.fillText('已装备', btnX + 40, itemY + i * 70);
-                    }
+            } catch(e) {}
+        }
+
+        function playComboBreakSound() {
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3);
+            } catch(e) {}
+        }
+
+        function playPauseSound() {
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = 440;
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.2);
+            } catch(e) {}
+        }
+
+        function playBossHitSound() {
+            try {
+                const ctx = getAudioCtx();
+                [200, 300, 400].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'square';
+                    osc.frequency.value = freq;
+                    const t = ctx.currentTime + i * 0.05;
+                    gain.gain.setValueAtTime(0.3, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+                    osc.start(t); osc.stop(t + 0.15);
                 });
-            } else if (shopTab === 'gacha') {
-                ctx.fillStyle = '#fff';
-                ctx.font = '20px Segoe UI';
-                ctx.textAlign = 'center';
-                ctx.fillText('🎰 盲盒抽取', cx, itemY - 10);
-                ctx.fillStyle = '#aaa';
-                ctx.font = '16px Segoe UI';
-                ctx.fillText('10连抽保底R，100金币/次', cx, itemY + 20);
-                
-                let btnW = 200, btnH = 60;
-                addButton(cx - btnW/2, itemY + 50, btnW, btnH, '🎁 10连抽 💰100', () => {
-                    if (!gachaAnimating && gameData.coins >= 100) {
-                        gameData.coins -= 100;
-                        saveGame();
-                        doGacha();
-                    }
-                }, gameData.coins >= 100 ? 'normal' : 'disabled');
-                
-                // Gacha result display
-                if (gachaResult.length > 0) {
-                    ctx.fillStyle = '#ffd700';
-                    ctx.font = 'bold 24px Segoe UI';
-                    ctx.fillText('抽取结果', cx, itemY + 140);
-                    gachaResult.forEach((r, i) => {
-                        let col = i % 5, row = Math.floor(i / 5);
-                        ctx.fillStyle = r.rarity === 'SR' ? '#ff6b6b' : r.rarity === 'R' ? '#4ecdc4' : '#ffd700';
-                        ctx.font = 'bold 18px Segoe UI';
-                        ctx.fillText(r.name, cx - 150 + col * 75, itemY + 170 + row * 35);
-                    });
-                }
-            }
-
-            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'menu'; gachaResult = []; }, 'success');
-            
-            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+            } catch(e) {}
         }
 
-        function doGacha() {
-            gachaResult = [];
-            let rollCount = 10;
-            let guaranteedR = false;
-            
-            for (let i = 0; i < rollCount; i++) {
-                let isR = i === 9 || Math.random() < 0.15;
-                if (isR) guaranteedR = true;
-                
-                let type = Math.random();
-                let item;
-                if (type < 0.4) {
-                    // Mole skin
-                    let owned = gameData.ownedMoleSkins.map((o, idx) => o ? -1 : idx).filter(idx => idx > 0);
-                    if (owned.length > 0) {
-                        let idx = owned[Math.floor(Math.random() * owned.length)];
-                        item = { type: 'mole', name: MOLE_SKINS[idx], rarity: 'R', skinIndex: idx };
-                        gameData.ownedMoleSkins[idx] = true;
-                    } else { item = { type: 'mole', name: '金币+50', rarity: 'N', skinIndex: 0 }; }
-                } else if (type < 0.7) {
-                    // Hammer skin
-                    let owned = gameData.ownedHammerSkins.map((o, idx) => o ? -1 : idx).filter(idx => idx > 0);
-                    if (owned.length > 0) {
-                        let idx = owned[Math.floor(Math.random() * owned.length)];
-                        item = { type: 'hammer', name: HAMMER_SKINS[idx], rarity: 'R', skinIndex: idx };
-                        gameData.ownedHammerSkins[idx] = true;
-                    } else { item = { type: 'hammer', name: '金币+50', rarity: 'N', skinIndex: 0 }; }
-                } else {
-                    // Coins
-                    item = { type: 'coins', name: `金币+${guaranteedR ? 200 : 100}`, rarity: 'N' };
-                    gameData.coins += guaranteedR ? 200 : 100;
-                }
-                gachaResult.push(item);
-            }
-            saveGame();
-            gachaAnimating = false;
+        function playBossDefeatSound() {
+            try {
+                const ctx = getAudioCtx();
+                [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    const t = ctx.currentTime + i * 0.15;
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+                    osc.start(t); osc.stop(t + 0.4);
+                });
+            } catch(e) {}
         }
 
-        // ==================== COLLECTION SCREEN ====================
-        function drawCollectionScreen() {
-            clearButtons();
-            ctx.fillStyle = 'rgba(0,0,0,0.85)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            let cx = canvas.width / 2;
-            
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 42px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.fillText('我的收藏', cx, 60);
-
-            // Mole skins
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 24px Segoe UI';
-            ctx.fillText('地鼠皮肤', cx, 120);
-            
-            for (let i = 0; i < 5; i++) {
-                let owned = gameData.ownedMoleSkins[i];
-                let equipped = gameData.equippedMoleSkin === i;
-                let x = 100 + i * 130;
-                
-                ctx.fillStyle = owned ? '#ffd700' : '#555';
-                ctx.fillRect(x, 140, 110, 80);
-                
-                ctx.fillStyle = '#fff';
-                ctx.font = '14px Segoe UI';
-                ctx.textAlign = 'center';
-                ctx.fillText(MOLE_SKINS[i], x + 55, 170);
-                ctx.fillText(owned ? (equipped ? '✓ 已装备' : '已拥有') : '未拥有', x + 55, 195);
-                
-                if (owned && !equipped) {
-                    let btnW = 80;
-                    addButton(x + 15, 230, btnW, 35, '装备', () => {
-                        gameData.equippedMoleSkin = i;
-                        saveGame();
-                    }, 'normal', '#4ecdc4');
-                }
-            }
-
-            // Hammer skins
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 24px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.fillText('锤子皮肤', cx, 310);
-            
-            for (let i = 0; i < 4; i++) {
-                let owned = gameData.ownedHammerSkins[i];
-                let equipped = gameData.equippedHammerSkin === i;
-                let x = 130 + i * 130;
-                
-                ctx.fillStyle = owned ? '#ffd700' : '#555';
-                ctx.fillRect(x, 330, 110, 80);
-                
-                ctx.fillStyle = '#fff';
-                ctx.font = '14px Segoe UI';
-                ctx.textAlign = 'center';
-                ctx.fillText(HAMMER_SKINS[i], x + 55, 360);
-                ctx.fillText(owned ? (equipped ? '✓ 已装备' : '已拥有') : '未拥有', x + 55, 385);
-                
-                if (owned && !equipped) {
-                    let btnW = 80;
-                    addButton(x + 15, 420, btnW, 35, '装备', () => {
-                        gameData.equippedHammerSkin = i;
-                        saveGame();
-                    }, 'normal', '#4ecdc4');
-                }
-            }
-
-            addButton(50, 50, 100, 40, '← 返回', () => { currentScreen = 'menu'; }, 'success');
-            
-            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+        function playLevelUpSound() {
+            try {
+                const ctx = getAudioCtx();
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    const t = ctx.currentTime + i * 0.12;
+                    gain.gain.setValueAtTime(0.3, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                    osc.start(t); osc.stop(t + 0.3);
+                });
+            } catch(e) {}
         }
 
-        // ==================== GAME OVER SCREEN ====================
-        let lastGameResult = null;
-        function drawGameOverScreen() {
-            if (!lastGameResult) return;
-            clearButtons();
-            ctx.fillStyle = 'rgba(0,0,0,0.85)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            let cx = canvas.width / 2;
-            
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 48px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.fillText(lastGameResult.title, cx, 100);
-            
-            ctx.fillStyle = '#fff';
-            ctx.font = '28px Segoe UI';
-            ctx.fillText(`得分: ${lastGameResult.score}`, cx, 180);
-            
-            // Stars
-            if (lastGameResult.stars !== undefined) {
-                drawStars(cx - 45, 230, lastGameResult.stars, 25);
-            }
-            
-            ctx.fillStyle = '#4ecdc4';
-            ctx.font = '22px Segoe UI';
-            ctx.fillText(`获得金币: ${lastGameResult.coins}`, cx, 300);
+        const praises = ['太棒了！', '厉害！', '完美！', '继续保持！', '真厉害！', '精彩！', '无可阻挡！', '继续加油！', '太牛了！', '满分！', '无敌！', '再来！'];
+        let praiseIndex = 0;
 
-            let btnW = 250, btnH = 60;
-            addButton(cx - btnW/2, 360, btnW, btnH, '返回主菜单', () => { 
-                currentScreen = 'menu'; lastGameResult = null; 
+        function playMilestoneSound() {
+            try {
+                const ctx = getAudioCtx();
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    const t = ctx.currentTime + i * 0.12;
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                    osc.start(t); osc.stop(t + 0.3);
+                });
+            } catch(e) {}
+        }
+
+        function showPraise(text) {
+            const popup = document.getElementById('praise-popup');
+            popup.textContent = text;
+            popup.classList.remove('hide');
+            popup.classList.add('show');
+            setTimeout(() => { popup.classList.remove('show'); popup.classList.add('hide'); }, 800);
+        }
+
+        // ============ SAVE DATA ============
+        function getSaveData() {
+            const data = localStorage.getItem('whackSaveData');
+            if (data) return JSON.parse(data);
+            return {
+                version: 2,
+                levels: [[0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0]],
+                bossHP: 10,
+                bossMaxHP: 10,
+                highScore: 0
+            };
+        }
+
+        function saveSaveData(data) {
+            localStorage.setItem('whackSaveData', JSON.stringify(data));
+        }
+
+        function getLevelStars(worldIdx, levelIdx) {
+            const data = getSaveData();
+            return data.levels[worldIdx]?.[levelIdx] || 0;
+        }
+
+        function setLevelStars(worldIdx, levelIdx, stars) {
+            const data = getSaveData();
+            if (!data.levels[worldIdx]) data.levels[worldIdx] = [0,0,0,0,0,0,0,0,0,0];
+            data.levels[worldIdx][levelIdx] = Math.max(data.levels[worldIdx][levelIdx], stars);
+            saveSaveData(data);
+        }
+
+        function isWorldUnlocked(worldIdx) {
+            if (worldIdx === 0) return true;
+            const data = getSaveData();
+            // World is unlocked if previous world has at least 1 star on any level
+            const prevWorld = data.levels[worldIdx - 1];
+            return prevWorld && prevWorld.some(s => s > 0);
+        }
+
+        function isBossDefeated(worldIdx) {
+            if (worldIdx !== 3) return false;
+            const data = getSaveData();
+            return data.bossHP <= 0;
+        }
+
+        // ============ GAME STATE ============
+        let score = 0;
+        let timeLeft = 30;
+        let gameRunning = false;
+        let gamePaused = false;
+        let gameTimer = null;
+        let moles = [];
+        let lastMilestone = 0;
+
+        // Level/World system
+        let currentWorld = 0;
+        let currentLevel = 0;
+        let levelMode = 'normal'; // 'normal' or 'boss'
+
+        // Boss state
+        let bossHP = 10;
+        let bossMaxHP = 10;
+        let bossHitCount = 0;
+        let bossHitsRequired = 3;
+        let bossActive = false;
+        let bossMesh = null;
+
+        // Stats
+        let totalClicks = 0;
+        let totalHits = 0;
+        let bestCombo = 0;
+        let gameStartTime = 0;
+        let pausedTime = 0;
+        let totalPausedTime = 0;
+
+        // Combo
+        let combo = 0;
+        let comboTimer = 0;
+        const comboTimeout = 60;
+        let lastHitTime = 0;
+
+        // Power-ups
+        let doubleScoreActive = false;
+        let freezeActive = false;
+        let fireShieldActive = false;
+        let doubleScoreTimer = null;
+        let freezeTimer = null;
+        let shieldTimer = null;
+
+        // ============ PARTICLE SYSTEM ============
+        const particles = [];
+        const particleGroup = new THREE.Group();
+        scene3.add(particleGroup);
+
+        function createParticle(x, y, z, color) {
+            const size = 0.05 + Math.random() * 0.1;
+            const geo = new THREE.SphereGeometry(size, 6, 6);
+            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.set(x, y, z);
+            const vx = (Math.random() - 0.5) * 0.2;
+            const vy = Math.random() * 0.15 + 0.1;
+            const vz = (Math.random() - 0.5) * 0.2;
+            particleGroup.add(p);
+            particles.push({ mesh: p, vx, vy, vz, life: 1 });
+        }
+
+        function spawnHitParticles(x, y, z, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                createParticle(x, y, z, color);
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.mesh.position.x += p.vx;
+                p.mesh.position.y += p.vy;
+                p.mesh.position.z += p.vz;
+                p.vy -= 0.01;
+                p.life -= 0.03;
+                p.mesh.material.opacity = p.life;
+                if (p.life <= 0) {
+                    particleGroup.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // ============ LAVA PARTICLES (World 4) ============
+        const lavaParticles = [];
+        const lavaParticleGroup = new THREE.Group();
+        scene3.add(lavaParticleGroup);
+
+        function createLavaParticle() {
+            const size = 0.03 + Math.random() * 0.05;
+            const geo = new THREE.SphereGeometry(size, 4, 4);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: new THREE.Color().setHSL(0.05 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.3),
+                transparent: true, 
+                opacity: 0.8 
             });
-            
-            if (lastGameResult.mode === 'level' && lastGameResult.world !== undefined) {
-                let nextLevel = lastGameResult.level + 1;
-                if (nextLevel < 10) {
-                    addButton(cx - btnW/2, 440, btnW, btnH, `下一关 (${nextLevel + 1}关)`, () => {
-                        selectedLevel = { world: lastGameResult.world, level: nextLevel };
-                        currentScreen = 'playing';
-                        gameMode = 'level';
-                        startLevelGame(lastGameResult.world, nextLevel);
-                    });
-                } else {
-                    ctx.fillStyle = '#ffd700';
-                    ctx.font = '20px Segoe UI';
-                    ctx.fillText('🎉 世界完成！', cx, 440);
-                }
-            }
-            
-            uiButtons.forEach((btn, i) => drawButton(btn, hoveredBtn === i));
+            const p = new THREE.Mesh(geo, mat);
+            // Random position in the scene
+            p.position.set(
+                (Math.random() - 0.5) * 20,
+                Math.random() * 0.5,
+                (Math.random() - 0.5) * 15
+            );
+            lavaParticleGroup.add(p);
+            lavaParticles.push({
+                mesh: p,
+                vy: 0.02 + Math.random() * 0.03,
+                life: 1,
+                maxLife: 1
+            });
         }
 
-        // ==================== THREE.JS SETUP ====================
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(WORLD_THEMES[0].bg);
-        scene.fog = new THREE.Fog(WORLD_THEMES[0].bg, 15, 35);
+        function updateLavaParticles() {
+            // Spawn new particles occasionally
+            if (currentWorld === 3 && gameRunning && Math.random() < 0.1) {
+                createLavaParticle();
+            }
+
+            for (let i = lavaParticles.length - 1; i >= 0; i--) {
+                const p = lavaParticles[i];
+                p.mesh.position.y += p.vy;
+                p.mesh.position.x += (Math.random() - 0.5) * 0.02;
+                p.life -= 0.01;
+                p.mesh.material.opacity = p.life * 0.8;
+                
+                if (p.life <= 0 || p.mesh.position.y > 3) {
+                    lavaParticleGroup.remove(p.mesh);
+                    lavaParticles.splice(i, 1);
+                }
+            }
+        }
+
+        // ============ THREE.JS SETUP ============
+        const scene3 = new THREE.Scene();
+        scene3.background = new THREE.Color(WORLD_THEMES[0].bg);
+        scene3.fog = new THREE.Fog(WORLD_THEMES[0].fog, 15, 35);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 8, 10);
@@ -807,11 +921,10 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-        scene.add(ambientLight);
+        const ambientLight = new THREE.AmbientLight(0xfff5e0, 0.6);
+        scene3.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+        const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.0);
         dirLight.position.set(5, 12, 8);
         dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 2048;
@@ -822,71 +935,163 @@
         dirLight.shadow.camera.right = 15;
         dirLight.shadow.camera.top = 15;
         dirLight.shadow.camera.bottom = -15;
-        scene.add(dirLight);
+        scene3.add(dirLight);
 
-        const fillLight = new THREE.DirectionalLight(0x88ccff, 0.3);
+        const fillLight = new THREE.DirectionalLight(0xffe0b0, 0.4);
         fillLight.position.set(-5, 5, -5);
-        scene.add(fillLight);
+        scene3.add(fillLight);
 
         // Ground
-        let ground, groundMat;
+        let ground;
         function createGround(theme) {
-            if (ground) scene.remove(ground);
+            if (ground) scene3.remove(ground);
             const groundGeo = new THREE.CircleGeometry(12, 64);
-            groundMat = new THREE.MeshStandardMaterial({ 
-                color: theme.ground,
-                roughness: 0.9,
-                metalness: 0.0
-            });
+            const groundMat = new THREE.MeshStandardMaterial({ color: theme.ground, roughness: 0.9, metalness: 0.0 });
             ground = new THREE.Mesh(groundGeo, groundMat);
             ground.rotation.x = -Math.PI / 2;
             ground.receiveShadow = true;
-            scene.add(ground);
-            
-            scene.background = new THREE.Color(theme.bg);
-            scene.fog = new THREE.Fog(theme.bg, 15, 35);
+            scene3.add(ground);
+            scene3.background = new THREE.Color(theme.bg);
+            scene3.fog.color = new THREE.Color(theme.fog);
         }
         createGround(WORLD_THEMES[0]);
 
         // Grass patches
-        let grassPatches = [];
-        function createGrassPatches(theme) {
-            grassPatches.forEach(p => scene.remove(p));
-            grassPatches = [];
-            for (let i = 0; i < 200; i++) {
+        function createGrassPatches(worldIdx) {
+            // Remove existing patches
+            const toRemove = [];
+            scene3.traverse(obj => {
+                if (obj.userData && obj.userData.isPatch) toRemove.push(obj);
+            });
+            toRemove.forEach(obj => scene3.remove(obj));
+
+            const patchCount = 200;
+            for (let i = 0; i < patchCount; i++) {
                 const patchGeo = new THREE.CircleGeometry(Math.random() * 0.1 + 0.05, 6);
-                const patchMat = new THREE.MeshStandardMaterial({ 
-                    color: new THREE.Color().setHSL(0.25 + Math.random() * 0.1, 0.6, 0.3 + Math.random() * 0.15)
-                });
+                let color;
+                if (worldIdx === 0) {
+                    color = new THREE.Color().setHSL(0.2 + Math.random() * 0.1, 0.4, 0.45 + Math.random() * 0.15);
+                } else if (worldIdx === 1) {
+                    color = new THREE.Color().setHSL(0.08 + Math.random() * 0.05, 0.3, 0.35 + Math.random() * 0.1);
+                } else if (worldIdx === 2) {
+                    color = new THREE.Color().setHSL(0.55 + Math.random() * 0.1, 0.2, 0.7 + Math.random() * 0.15);
+                } else {
+                    // Lava world - mostly dark with occasional warm colors
+                    color = new THREE.Color().setHSL(0.05 + Math.random() * 0.1, 0.6, 0.15 + Math.random() * 0.1);
+                }
+                const patchMat = new THREE.MeshStandardMaterial({ color });
                 const patch = new THREE.Mesh(patchGeo, patchMat);
                 const angle = Math.random() * Math.PI * 2;
                 const radius = Math.random() * 10 + 2;
                 patch.position.set(Math.cos(angle) * radius, 0.01, Math.sin(angle) * radius);
                 patch.rotation.x = -Math.PI / 2;
-                scene.add(patch);
-                grassPatches.push(patch);
+                patch.userData.isPatch = true;
+                scene3.add(patch);
             }
         }
-        createGrassPatches(WORLD_THEMES[0]);
+        createGrassPatches(0);
+
+        // Decorative trees
+        const treeGroup = new THREE.Group();
+        scene3.add(treeGroup);
+        function createTree(x, z, worldIdx) {
+            const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 6);
+            let trunkColor;
+            if (worldIdx === 0) trunkColor = 0x8B4513;
+            else if (worldIdx === 1) trunkColor = 0x4a3020;
+            else if (worldIdx === 2) trunkColor = 0x3a4a5a;
+            else trunkColor = 0x3a1a0a;
+            const trunkMat = new THREE.MeshStandardMaterial({ color: trunkColor, roughness: 0.9 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.set(x, 0.75, z);
+            trunk.castShadow = true;
+            treeGroup.add(trunk);
+
+            let leavesColor;
+            if (worldIdx === 0) leavesColor = 0x5a8a4a;
+            else if (worldIdx === 1) leavesColor = 0x6a5a4a;
+            else if (worldIdx === 2) leavesColor = 0x8ab0c0;
+            else leavesColor = 0x6a2a0a;
+            const leavesGeo = new THREE.SphereGeometry(0.8, 8, 8);
+            const leavesMat = new THREE.MeshStandardMaterial({ color: leavesColor, roughness: 0.8 });
+            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            leaves.position.set(x, 2, z);
+            leaves.castShadow = true;
+            treeGroup.add(leaves);
+        }
+
+        const treePositions = [
+            [-8, -8], [-8, 0], [-8, 8], [8, -8], [8, 0], [8, 8],
+            [-6, -10], [0, -10], [6, -10], [-6, 10], [0, 10], [6, 10],
+            [-10, -6], [-10, 6], [10, -6], [10, 6]
+        ];
+        function updateTrees(worldIdx) {
+            while (treeGroup.children.length > 0) {
+                treeGroup.remove(treeGroup.children[0]);
+            }
+            treePositions.forEach(([x, z]) => createTree(x, z, worldIdx));
+        }
+        updateTrees(0);
+
+        // Decorative flowers
+        const flowerGroup = new THREE.Group();
+        scene3.add(flowerGroup);
+        function createFlower(x, z, color) {
+            const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4);
+            const stemMat = new THREE.MeshStandardMaterial({ color: 0x4a7a3a });
+            const stem = new THREE.Mesh(stemGeo, stemMat);
+            stem.position.set(x, 0.15, z);
+            flowerGroup.add(stem);
+
+            const petalGeo = new THREE.SphereGeometry(0.08, 6, 6);
+            const petalMat = new THREE.MeshStandardMaterial({ color });
+            const petal = new THREE.Mesh(petalGeo, petalMat);
+            petal.position.set(x, 0.35, z);
+            flowerGroup.add(petal);
+        }
+
+        function updateFlowers(worldIdx) {
+            while (flowerGroup.children.length > 0) {
+                flowerGroup.remove(flowerGroup.children[0]);
+            }
+            if (worldIdx === 2) return; // No flowers in ice world
+            
+            const flowerColors = worldIdx === 3 
+                ? [0xff4500, 0xff6600, 0xff8c00] // Lava colors
+                : [0xff6b6b, 0xffd700, 0xff69b4, 0x9b59b6, 0xff8c00];
+            for (let i = 0; i < 40; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 3 + Math.random() * 7;
+                const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+                createFlower(Math.cos(angle) * radius, Math.sin(angle) * radius, color);
+            }
+        }
+        updateFlowers(0);
 
         // Holes
         const holes = [];
         const holeGroup = new THREE.Group();
-        scene.add(holeGroup);
+        scene3.add(holeGroup);
 
-        function createHoles() {
+        function createHoles(theme) {
+            // Remove old holes
             while (holeGroup.children.length > 0) {
                 holeGroup.remove(holeGroup.children[0]);
             }
             holes.length = 0;
-            
+
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 3; col++) {
                     const x = (col - 1) * 3;
                     const z = (row - 1) * 3;
 
                     const rimGeo = new THREE.TorusGeometry(0.7, 0.15, 16, 32);
-                    const rimMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 });
+                    const rimMat = new THREE.MeshStandardMaterial({ 
+                        color: theme.holeRim, 
+                        roughness: 0.8,
+                        emissive: worldIdx === 3 ? 0xff2200 : 0x000000,
+                        emissiveIntensity: worldIdx === 3 ? 0.3 : 0
+                    });
                     const rim = new THREE.Mesh(rimGeo, rimMat);
                     rim.rotation.x = -Math.PI / 2;
                     rim.position.set(x, 0.02, z);
@@ -895,7 +1100,7 @@
                     holeGroup.add(rim);
 
                     const holeGeo = new THREE.CircleGeometry(0.6, 32);
-                    const holeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
+                    const holeMat = new THREE.MeshStandardMaterial({ color: theme.holeInner, roughness: 1 });
                     const holeMesh = new THREE.Mesh(holeGeo, holeMat);
                     holeMesh.rotation.x = -Math.PI / 2;
                     holeMesh.position.set(x, 0.01, z);
@@ -905,183 +1110,437 @@
                 }
             }
         }
-        createHoles();
+        createHoles(WORLD_THEMES[0]);
+        let worldIdx = 0;
 
-        // Mole creation with skin support
-        function createMole(skinIndex = 0) {
+        function setWorldTheme(wIdx) {
+            worldIdx = wIdx;
+            const theme = WORLD_THEMES[wIdx];
+            createGround(theme);
+            createGrassPatches(wIdx);
+            updateTrees(wIdx);
+            updateFlowers(wIdx);
+            createHoles(theme);
+        }
+
+        // ============ BOSS MESH ============
+        function createBoss() {
+            if (bossMesh) {
+                scene3.remove(bossMesh);
+                bossMesh = null;
+            }
+
+            const bossGroup = new THREE.Group();
+            bossGroup.userData.isBoss = true;
+
+            // Boss body - giant hand
+            const handGeo = new THREE.BoxGeometry(1.5, 2, 0.8);
+            const handMat = new THREE.MeshStandardMaterial({ 
+                color: 0x8b2500, 
+                roughness: 0.6,
+                emissive: 0xff2200,
+                emissiveIntensity: 0.2
+            });
+            const hand = new THREE.Mesh(handGeo, handMat);
+            hand.position.y = 1;
+            hand.castShadow = true;
+            hand.name = 'hand';
+            bossGroup.add(hand);
+
+            // Fingers
+            for (let i = -1; i <= 1; i++) {
+                const fingerGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.8, 8);
+                const finger = new THREE.Mesh(fingerGeo, handMat);
+                finger.position.set(i * 0.4, 2.2, 0);
+                finger.castShadow = true;
+                finger.name = `finger${i+1}`;
+                bossGroup.add(finger);
+            }
+
+            // Eyes (glowing)
+            const eyeGeo = new THREE.SphereGeometry(0.15, 16, 16);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff4500, emissive: 0xff4500 });
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(-0.3, 1.5, 0.4);
+            leftEye.name = 'leftEye';
+            bossGroup.add(leftEye);
+            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+            rightEye.position.set(0.3, 1.5, 0.4);
+            rightEye.name = 'rightEye';
+            bossGroup.add(rightEye);
+
+            // Position boss above center hole
+            bossGroup.position.set(0, -2, 0);
+            bossGroup.visible = false;
+            scene3.add(bossGroup);
+            bossMesh = bossGroup;
+
+            return bossGroup;
+        }
+
+        function showBoss() {
+            if (!bossMesh) createBoss();
+            bossMesh.visible = true;
+            bossActive = true;
+            
+            // Animate boss rising
+            const targetY = 0.5;
+            const startTime = Date.now();
+            function animateRise() {
+                if (!bossMesh || !bossActive) return;
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / 500, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                bossMesh.position.y = -2 + (targetY + 2) * eased;
+                if (progress < 1) requestAnimationFrame(animateRise);
+            }
+            animateRise();
+
+            // Show boss UI
+            document.getElementById('boss-hp-container').style.display = 'block';
+            document.getElementById('boss-hp-text').style.display = 'block';
+            document.getElementById('boss-hit-counter').style.display = 'block';
+            updateBossUI();
+        }
+
+        function hideBoss() {
+            if (!bossMesh) return;
+            
+            // Animate boss going down
+            const startY = bossMesh.position.y;
+            const startTime = Date.now();
+            function animateHide() {
+                if (!bossMesh) return;
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / 300, 1);
+                bossMesh.position.y = startY - progress * 2;
+                if (progress < 1) {
+                    requestAnimationFrame(animateHide);
+                } else {
+                    bossMesh.visible = false;
+                }
+            }
+            animateHide();
+
+            bossActive = false;
+            bossHitCount = 0;
+            document.getElementById('boss-hp-container').style.display = 'none';
+            document.getElementById('boss-hp-text').style.display = 'none';
+            document.getElementById('boss-hit-counter').style.display = 'none';
+        }
+
+        function damageBoss() {
+            if (!bossActive) return false;
+            
+            bossHitCount++;
+            playBossHitSound();
+            updateBossUI();
+
+            // Spawn fire particles
+            if (bossMesh) {
+                const pos = bossMesh.position.clone();
+                pos.y += 1;
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 20);
+            }
+
+            if (bossHitCount >= bossHitsRequired) {
+                // Boss defeated
+                bossHP--;
+                bossHitCount = 0;
+                updateBossUI();
+
+                if (bossHP <= 0) {
+                    // Boss fully defeated
+                    playBossDefeatSound();
+                    hideBoss();
+                    showBossVictory();
+                    return true;
+                } else {
+                    // Boss retreats temporarily
+                    hideBoss();
+                    setTimeout(() => {
+                        if (gameRunning && bossActive === false) {
+                            showBoss();
+                        }
+                    }, 2000);
+                }
+            }
+            return true;
+        }
+
+        function updateBossUI() {
+            const hpBar = document.getElementById('boss-hp-bar');
+            const hpVal = document.getElementById('boss-hp-val');
+            const hitVal = document.getElementById('boss-hit-val');
+            
+            if (hpBar) hpBar.style.width = (bossHP / bossMaxHP * 100) + '%';
+            if (hpVal) hpVal.textContent = bossHP;
+            if (hitVal) hitVal.textContent = bossHitCount;
+        }
+
+        function showBossVictory() {
+            gameRunning = false;
+            clearInterval(gameTimer);
+            
+            // Fireworks
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    const fw = document.createElement('div');
+                    fw.className = 'firework';
+                    fw.style.left = (Math.random() * 80 + 10) + '%';
+                    fw.style.top = (Math.random() * 60 + 20) + '%';
+                    fw.style.background = ['#ff4500', '#ffd700', '#ff6600', '#ff8c00'][Math.floor(Math.random() * 4)];
+                    document.body.appendChild(fw);
+                    setTimeout(() => fw.remove(), 1000);
+                }, i * 100);
+            }
+
+            // Calculate stars
+            const stars = score >= 1500 ? 3 : score >= 1000 ? 2 : score >= 500 ? 1 : 0;
+            
+            document.getElementById('boss-final-score').textContent = score;
+            document.getElementById('boss-victory').style.display = 'flex';
+            
+            // Save progress
+            const data = getSaveData();
+            data.bossHP = 0;
+            saveSaveData(data);
+
+            playLevelUpSound();
+        }
+
+        // ============ MOLE CREATION ============
+        function createMole(type = 'normal') {
             const moleGroup = new THREE.Group();
-            const colors = MOLE_SKIN_COLORS[skinIndex] || MOLE_SKIN_COLORS[0];
-            const bodyMat = new THREE.MeshStandardMaterial({ color: colors.body, roughness: 0.7 });
-            const headMat = new THREE.MeshStandardMaterial({ color: colors.head, roughness: 0.7 });
+            moleGroup.userData.moleType = type;
+            moleGroup.userData.isMole = true;
 
-            // Body
+            let bodyColor;
+            let roughness = 0.7;
+            let metalness = 0;
+
+            if (type === 'golden') {
+                bodyColor = 0xffd700;
+                metalness = 0.5;
+            } else if (type === 'bomb') {
+                bodyColor = 0x333333;
+            } else if (type === 'fire') {
+                // Fire mole for World 4
+                bodyColor = 0xff4500;
+                roughness = 0.5;
+            } else {
+                bodyColor = 0x8B6914;
+            }
+
+            const bodyMat = new THREE.MeshStandardMaterial({ 
+                color: bodyColor, 
+                roughness, 
+                metalness,
+                emissive: type === 'fire' ? 0xff2200 : 0x000000,
+                emissiveIntensity: type === 'fire' ? 0.2 : 0
+            });
             const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.scale.set(1, 0.8, 1);
             body.position.y = 0.4;
             body.castShadow = true;
+            body.name = 'body';
             moleGroup.add(body);
 
-            // Head
             const headGeo = new THREE.SphereGeometry(0.45, 32, 32);
-            const head = new THREE.Mesh(headGeo, headMat);
+            const head = new THREE.Mesh(headGeo, bodyMat);
             head.position.y = 0.9;
             head.castShadow = true;
+            head.name = 'head';
             moleGroup.add(head);
 
-            // Engineer additions
-            if (skinIndex === 1) {
-                const helmetGeo = new THREE.SphereGeometry(0.48, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-                const helmetMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
-                const helmet = new THREE.Mesh(helmetGeo, helmetMat);
-                helmet.position.y = 0.95;
-                helmet.rotation.x = Math.PI;
-                moleGroup.add(helmet);
-            }
-            
-            // Zombie additions
-            if (skinIndex === 2) {
-                const patchGeo = new THREE.CircleGeometry(0.1, 8);
-                const patchMat = new THREE.MeshStandardMaterial({ color: 0x556B2F });
-                for (let i = 0; i < 3; i++) {
-                    const patch = new THREE.Mesh(patchGeo, patchMat);
-                    patch.position.set(-0.2 + i * 0.2, 0.95, 0.3);
-                    patch.rotation.x = -Math.PI / 2;
-                    moleGroup.add(patch);
-                }
-            }
-            
-            // Dino additions
-            if (skinIndex === 3) {
-                const spikeGeo = new THREE.ConeGeometry(0.08, 0.3, 8);
-                const spikeMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-                for (let i = 0; i < 5; i++) {
-                    const spike = new THREE.Mesh(spikeGeo, spikeMat);
-                    spike.position.set(-0.25 + i * 0.125, 1.35, 0);
-                    spike.rotation.z = (i - 2) * 0.15;
-                    moleGroup.add(spike);
-                }
-            }
-            
-            // Mech additions
-            if (skinIndex === 4) {
-                const visorGeo = new THREE.BoxGeometry(0.35, 0.15, 0.1);
-                const visorMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 });
-                const visor = new THREE.Mesh(visorGeo, visorMat);
-                visor.position.set(0, 1.0, 0.4);
-                moleGroup.add(visor);
-                
-                const earGeo = new THREE.BoxGeometry(0.1, 0.2, 0.1);
-                const earMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.9 });
-                const leftEar = new THREE.Mesh(earGeo, earMat);
-                leftEar.position.set(-0.38, 1.15, 0);
+            if (type === 'bomb') {
+                const fuseGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8);
+                const fuseMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const fuse = new THREE.Mesh(fuseGeo, fuseMat);
+                fuse.position.set(0, 1.35, 0);
+                moleGroup.add(fuse);
+
+                const sparkGeo = new THREE.SphereGeometry(0.06, 8, 8);
+                const sparkMat = new THREE.MeshBasicMaterial({ color: 0xff4500 });
+                const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                spark.position.set(0, 1.5, 0);
+                spark.name = 'spark';
+                moleGroup.add(spark);
+
+                const eyeGeo = new THREE.SphereGeometry(0.1, 16, 16);
+                const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                leftEye.position.set(-0.15, 1.0, 0.35);
+                leftEye.name = 'leftEye';
+                moleGroup.add(leftEye);
+                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                rightEye.position.set(0.15, 1.0, 0.35);
+                rightEye.name = 'rightEye';
+                moleGroup.add(rightEye);
+            } else {
+                const snoutColor = type === 'golden' ? 0xffa500 : type === 'fire' ? 0xff6600 : 0x6B4E0A;
+                const snoutGeo = new THREE.SphereGeometry(0.15, 16, 16);
+                const snoutMat = new THREE.MeshStandardMaterial({ color: snoutColor, roughness: 0.8 });
+                const snout = new THREE.Mesh(snoutGeo, snoutMat);
+                snout.position.set(0, 0.85, 0.38);
+                snout.scale.set(1, 0.7, 1);
+                snout.name = 'snout';
+                moleGroup.add(snout);
+
+                const noseColor = type === 'golden' ? 0xff6600 : type === 'fire' ? 0xff0000 : 0xff6699;
+                const noseGeo = new THREE.SphereGeometry(0.06, 16, 16);
+                const noseMat = new THREE.MeshStandardMaterial({ color: noseColor, roughness: 0.5 });
+                const nose = new THREE.Mesh(noseGeo, noseMat);
+                nose.position.set(0, 0.88, 0.52);
+                nose.name = 'nose';
+                moleGroup.add(nose);
+
+                const eyeGeo = new THREE.SphereGeometry(0.08, 16, 16);
+                const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                leftEye.position.set(-0.15, 1.0, 0.35);
+                leftEye.name = 'leftEye';
+                moleGroup.add(leftEye);
+                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                rightEye.position.set(0.15, 1.0, 0.35);
+                rightEye.name = 'rightEye';
+                moleGroup.add(rightEye);
+
+                const highlightGeo = new THREE.SphereGeometry(0.03, 8, 8);
+                const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const leftHighlight = new THREE.Mesh(highlightGeo, highlightMat);
+                leftHighlight.position.set(-0.13, 1.03, 0.41);
+                leftHighlight.name = 'leftHighlight';
+                moleGroup.add(leftHighlight);
+                const rightHighlight = new THREE.Mesh(highlightGeo, highlightMat);
+                rightHighlight.position.set(0.17, 1.03, 0.41);
+                rightHighlight.name = 'rightHighlight';
+                moleGroup.add(rightHighlight);
+
+                const earGeo = new THREE.SphereGeometry(0.12, 16, 16);
+                const leftEar = new THREE.Mesh(earGeo, bodyMat);
+                leftEar.position.set(-0.35, 1.2, 0);
+                leftEar.castShadow = true;
+                leftEar.name = 'leftEar';
                 moleGroup.add(leftEar);
-                const rightEar = new THREE.Mesh(earGeo, earMat);
-                rightEar.position.set(0.38, 1.15, 0);
+                const rightEar = new THREE.Mesh(earGeo, bodyMat);
+                rightEar.position.set(0.35, 1.2, 0);
+                rightEar.castShadow = true;
+                rightEar.name = 'rightEar';
                 moleGroup.add(rightEar);
+
+                const cheekColor = type === 'golden' ? 0xffffaa : type === 'fire' ? 0xffaaaa : 0xffaaaa;
+                const cheekGeo = new THREE.SphereGeometry(0.1, 16, 16);
+                const cheekMat = new THREE.MeshStandardMaterial({ color: cheekColor, transparent: true, opacity: 0.5 });
+                const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
+                leftCheek.position.set(-0.28, 0.9, 0.3);
+                leftCheek.scale.set(1, 0.6, 0.3);
+                leftCheek.name = 'leftCheek';
+                moleGroup.add(leftCheek);
+                const rightCheek = new THREE.Mesh(cheekGeo, cheekMat);
+                rightCheek.position.set(0.28, 0.9, 0.3);
+                rightCheek.scale.set(1, 0.6, 0.3);
+                rightCheek.name = 'rightCheek';
+                moleGroup.add(rightCheek);
+
+                const toothGeo = new THREE.BoxGeometry(0.08, 0.1, 0.05);
+                const toothMat = new THREE.MeshStandardMaterial({ color: 0xfffff0 });
+                const leftTooth = new THREE.Mesh(toothGeo, toothMat);
+                leftTooth.position.set(-0.06, 0.72, 0.4);
+                leftTooth.name = 'leftTooth';
+                moleGroup.add(leftTooth);
+                const rightTooth = new THREE.Mesh(toothGeo, toothMat);
+                rightTooth.position.set(0.06, 0.72, 0.4);
+                rightTooth.name = 'rightTooth';
+                moleGroup.add(rightTooth);
             }
 
-            // Snout
-            const snoutGeo = new THREE.SphereGeometry(0.15, 16, 16);
-            const snoutMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.body).multiplyScalar(0.7), roughness: 0.8 });
-            const snout = new THREE.Mesh(snoutGeo, snoutMat);
-            snout.position.set(0, 0.85, 0.38);
-            snout.scale.set(1, 0.7, 1);
-            moleGroup.add(snout);
-
-            // Nose
-            const noseGeo = new THREE.SphereGeometry(0.06, 16, 16);
-            const noseMat = new THREE.MeshStandardMaterial({ color: 0xff6699, roughness: 0.5 });
-            const nose = new THREE.Mesh(noseGeo, noseMat);
-            nose.position.set(0, 0.88, 0.52);
-            moleGroup.add(nose);
-
-            // Eyes
-            const eyeGeo = new THREE.SphereGeometry(0.08, 16, 16);
-            const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-            leftEye.position.set(-0.15, 1.0, 0.35);
-            moleGroup.add(leftEye);
-            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-            rightEye.position.set(0.15, 1.0, 0.35);
-            moleGroup.add(rightEye);
-
-            // Eye highlights
-            const highlightGeo = new THREE.SphereGeometry(0.03, 8, 8);
-            const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const leftHighlight = new THREE.Mesh(highlightGeo, highlightMat);
-            leftHighlight.position.set(-0.13, 1.03, 0.41);
-            moleGroup.add(leftHighlight);
-            const rightHighlight = new THREE.Mesh(highlightGeo, highlightMat);
-            rightHighlight.position.set(0.17, 1.03, 0.41);
-            moleGroup.add(rightHighlight);
-
-            // Ears
-            const earGeo = new THREE.SphereGeometry(0.12, 16, 16);
-            const leftEar = new THREE.Mesh(earGeo, bodyMat);
-            leftEar.position.set(-0.35, 1.2, 0);
-            leftEar.castShadow = true;
-            moleGroup.add(leftEar);
-            const rightEar = new THREE.Mesh(earGeo, bodyMat);
-            rightEar.position.set(0.35, 1.2, 0);
-            rightEar.castShadow = true;
-            moleGroup.add(rightEar);
-
-            // Cheeks
-            const cheekGeo = new THREE.SphereGeometry(0.1, 16, 16);
-            const cheekMat = new THREE.MeshStandardMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.5 });
-            const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
-            leftCheek.position.set(-0.28, 0.9, 0.3);
-            leftCheek.scale.set(1, 0.6, 0.3);
-            moleGroup.add(leftCheek);
-            const rightCheek = new THREE.Mesh(cheekGeo, cheekMat);
-            rightCheek.position.set(0.28, 0.9, 0.3);
-            rightCheek.scale.set(1, 0.6, 0.3);
-            moleGroup.add(rightCheek);
-
-            // Teeth
-            const toothGeo = new THREE.BoxGeometry(0.08, 0.1, 0.05);
-            const toothMat = new THREE.MeshStandardMaterial({ color: 0xfffff0 });
-            const leftTooth = new THREE.Mesh(toothGeo, toothMat);
-            leftTooth.position.set(-0.06, 0.72, 0.4);
-            moleGroup.add(leftTooth);
-            const rightTooth = new THREE.Mesh(toothGeo, toothMat);
-            rightTooth.position.set(0.06, 0.72, 0.4);
-            moleGroup.add(rightTooth);
-
-            moleGroup.userData = { isMole: true, baseY: 0, hit: false, skinIndex };
             return moleGroup;
         }
 
-        // Game state
-        let score = 0;
-        let combo = 0;
-        let timeLeft = 30;
-        let gameRunning = false;
-        let gameMode = 'classic';
-        let currentWorld = 0;
-        let currentLevel = 0;
-        let gameTimer = null;
-        let moles = [];
-        let instantItemUsed = { slow: false, double: false, super: 0 };
+        function setMoleHitExpression(moleGroup, type) {
+            if (type === 'bomb') return;
 
-        // Show mole at hole
-        function showMole(holeIndex) {
+            const head = moleGroup.getObjectByName('head');
+            if (head) {
+                head.scale.set(1.1, 0.75, 1.1);
+            }
+
+            const leftEye = moleGroup.getObjectByName('leftEye');
+            const rightEye = moleGroup.getObjectByName('rightEye');
+            const leftHighlight = moleGroup.getObjectByName('leftHighlight');
+            const rightHighlight = moleGroup.getObjectByName('rightHighlight');
+
+            if (leftEye) {
+                leftEye.geometry = new THREE.SphereGeometry(0.1, 4, 4);
+                leftEye.material.color.setHex(0x111111);
+            }
+            if (rightEye) {
+                rightEye.geometry = new THREE.SphereGeometry(0.1, 4, 4);
+                rightEye.material.color.setHex(0x111111);
+            }
+            if (leftHighlight) leftHighlight.visible = false;
+            if (rightHighlight) rightHighlight.visible = false;
+
+            const leftTooth = moleGroup.getObjectByName('leftTooth');
+            const rightTooth = moleGroup.getObjectByName('rightTooth');
+            if (leftTooth) leftTooth.visible = false;
+            if (rightTooth) rightTooth.visible = false;
+
+            const leftCheek = moleGroup.getObjectByName('leftCheek');
+            const rightCheek = moleGroup.getObjectByName('rightCheek');
+            if (leftCheek) leftCheek.visible = false;
+            if (rightCheek) rightCheek.visible = false;
+        }
+
+        // ============ POWER-UP MESH ============
+        function createPowerupMesh(type) {
+            const group = new THREE.Group();
+            group.userData.powerupType = type;
+            group.userData.isPowerup = true;
+
+            let color;
+            if (type === 'double') {
+                color = 0xffd700;
+            } else if (type === 'freeze') {
+                color = 0x4ecdc4;
+            } else if (type === 'fireShield') {
+                color = 0xff4500;
+            }
+
+            const starGeo = new THREE.OctahedronGeometry(0.4, 0);
+            const starMat = new THREE.MeshStandardMaterial({ 
+                color, 
+                metalness: 0.5, 
+                roughness: 0.3, 
+                emissive: color,
+                emissiveIntensity: 0.3 
+            });
+            const star = new THREE.Mesh(starGeo, starMat);
+            star.rotation.z = Math.PI / 4;
+            group.add(star);
+            return group;
+        }
+
+        // ============ SPAWNING ============
+        let spawnInterval = 1200;
+        let moleDuration = 60;
+
+        function showMole(holeIndex, type = 'normal') {
             if (holes[holeIndex].occupied) return;
             
-            const mole = createMole(getEquippedMoleSkin());
+            const mole = createMole(type);
             mole.position.set(holes[holeIndex].x, -1, holes[holeIndex].z);
             mole.userData.holeIndex = holeIndex;
-            scene.add(mole);
+            scene3.add(mole);
             
             holes[holeIndex].occupied = true;
             holes[holeIndex].mole = mole;
-            moles.push({ mesh: mole, holeIndex, state: 'rising', timer: 0, duration: 0, hit: false });
+            moles.push({ mesh: mole, holeIndex, state: 'rising', timer: 0, hit: false, moleType: type, isPowerup: false });
 
             const targetY = 0.6;
-            let duration = 400 / getPassiveSpeedBonus();
-            if (selectedInstantItem === 'slow') duration *= 2;
-            
+            const duration = 400;
             const startTime = Date.now();
             const startY = -1;
             
@@ -1091,14 +1550,40 @@
                 const progress = Math.min(elapsed / duration, 1);
                 const eased = 1 - Math.pow(1 - progress, 3) * Math.cos(progress * Math.PI * 0.5);
                 mole.position.y = startY + (targetY - startY) * eased;
-                if (progress < 1) {
-                    requestAnimationFrame(animateRise);
-                }
+                if (progress < 1) requestAnimationFrame(animateRise);
             }
             animateRise();
         }
 
-        // Hide mole
+        function showPowerup(holeIndex, type) {
+            if (holes[holeIndex].occupied) return;
+            
+            const powerup = createPowerupMesh(type);
+            powerup.position.set(holes[holeIndex].x, -1, holes[holeIndex].z);
+            powerup.userData.holeIndex = holeIndex;
+            scene3.add(powerup);
+            
+            holes[holeIndex].occupied = true;
+            holes[holeIndex].mole = powerup;
+            moles.push({ mesh: powerup, holeIndex, state: 'rising', timer: 0, hit: false, isPowerup: true, powerupType: type });
+
+            const targetY = 0.8;
+            const duration = 400;
+            const startTime = Date.now();
+            const startY = -1;
+
+            function animateRise() {
+                if (!gameRunning || powerup.userData.hit) return;
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3) * Math.cos(progress * Math.PI * 0.5);
+                powerup.position.y = startY + (targetY - startY) * eased;
+                powerup.rotation.y += 0.05;
+                if (progress < 1) requestAnimationFrame(animateRise);
+            }
+            animateRise();
+        }
+
         function hideMole(moleData) {
             const mole = moleData.mesh;
             const holeIndex = moleData.holeIndex;
@@ -1118,33 +1603,192 @@
                 if (progress < 1) {
                     requestAnimationFrame(animateHide);
                 } else {
-                    scene.remove(mole);
+                    scene3.remove(mole);
                     moles = moles.filter(m => m !== moleData);
                 }
             }
             animateHide();
         }
 
-        // Whack mole
+        // ============ UI HELPERS ============
+        function showScorePopup(x, y, text, color) {
+            const popup = document.createElement('div');
+            popup.className = 'score-popup';
+            popup.textContent = text;
+            popup.style.left = x + 'px';
+            popup.style.top = y + 'px';
+            popup.style.color = color;
+            popup.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 800);
+        }
+
+        function updateComboBar() {
+            const bar = document.getElementById('combo-bar');
+            const pct = Math.max(0, 100 - (comboTimer / comboTimeout) * 100);
+            bar.style.width = pct + '%';
+        }
+
+        function showComboBreak() {
+            if (combo >= 3) {
+                const el = document.getElementById('combo-break');
+                el.classList.remove('hide');
+                el.classList.add('show');
+                playComboBreakSound();
+                setTimeout(() => { el.classList.remove('show'); el.classList.add('hide'); }, 500);
+            }
+            combo = 0;
+            updateComboDisplay();
+        }
+
+        function updateComboDisplay() {
+            const display = document.getElementById('combo-display');
+            const count = document.getElementById('combo-count');
+            if (combo >= 2) {
+                display.style.display = 'inline';
+                count.textContent = combo + 'x';
+            } else {
+                display.style.display = 'none';
+            }
+            if (combo > bestCombo) bestCombo = combo;
+        }
+
+        function getComboMultiplier() {
+            if (combo >= 20) return 3;
+            if (combo >= 10) return 2;
+            if (combo >= 5) return 1.5;
+            return 1;
+        }
+
+        function activatePowerup(type) {
+            playPowerupSound();
+            if (type === 'double') {
+                doubleScoreActive = true;
+                document.getElementById('badge-double').classList.add('active');
+                if (doubleScoreTimer) clearTimeout(doubleScoreTimer);
+                doubleScoreTimer = setTimeout(() => {
+                    doubleScoreActive = false;
+                    document.getElementById('badge-double').classList.remove('active');
+                }, 8000);
+            } else if (type === 'freeze') {
+                freezeActive = true;
+                document.getElementById('badge-freeze').classList.add('active');
+                if (freezeTimer) clearTimeout(freezeTimer);
+                freezeTimer = setTimeout(() => {
+                    freezeActive = false;
+                    document.getElementById('badge-freeze').classList.remove('active');
+                }, 5000);
+            } else if (type === 'fireShield') {
+                fireShieldActive = true;
+                document.getElementById('badge-shield').classList.add('active');
+                if (shieldTimer) clearTimeout(shieldTimer);
+                shieldTimer = setTimeout(() => {
+                    fireShieldActive = false;
+                    document.getElementById('badge-shield').classList.remove('active');
+                }, 15000);
+            }
+        }
+
+        // ============ WHACK ============
         function whackMole(moleData) {
             if (moleData.hit) return;
             moleData.hit = true;
-            
-            // Super hammer always hits
-            if (selectedInstantItem === 'super' && instantItemUsed.super < 5) {
-                instantItemUsed.super++;
+            totalHits++;
+
+            const pos = moleData.mesh.position.clone();
+            pos.y = 1;
+            const screenPos = pos.project(camera);
+            const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+
+            if (moleData.isPowerup) {
+                activatePowerup(moleData.powerupType);
+                const color = moleData.powerupType === 'double' ? '#ffd700' : moleData.powerupType === 'freeze' ? '#4ecdc4' : '#ff4500';
+                const text = moleData.powerupType === 'double' ? '2倍得分！' : moleData.powerupType === 'freeze' ? '冻结！' : '火焰护盾！';
+                showScorePopup(x, y, text, color);
+                const particleColor = moleData.powerupType === 'double' ? 0xffd700 : moleData.powerupType === 'freeze' ? 0x4ecdc4 : 0xff4500;
+                spawnHitParticles(pos.x, pos.y, pos.z, particleColor, 20);
+                hideMole(moleData);
+                return;
             }
-            
-            combo++;
-            let points = 100 + (combo - 1) * 10;
-            if (selectedInstantItem === 'double') points *= 2;
-            score += points;
-            
-            updateScoreDisplay();
-            showHitEffect(moleData);
-            
-            playWhackSound();
-            
+
+            const type = moleData.moleType;
+
+            if (type === 'bomb') {
+                // Check fire shield first
+                if (fireShieldActive) {
+                    fireShieldActive = false;
+                    document.getElementById('badge-shield').classList.remove('active');
+                    showScorePopup(x, y, '护盾抵挡！', '#ff4500');
+                    spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 15);
+                    hideMole(moleData);
+                    return;
+                }
+                
+                playBombSound();
+                let pts = -20;
+                if (doubleScoreActive) pts *= 2;
+                score += pts;
+                document.getElementById('score-display').textContent = score;
+                showHitEffect(x, y, '#ff0000');
+                showScorePopup(x, y, pts + '', '#ff4444');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 25);
+                showComboBreak();
+            } else if (type === 'golden') {
+                playGoldenSound();
+                combo++;
+                lastHitTime = Date.now();
+                comboTimer = 0;
+                let pts = 50;
+                pts = Math.floor(pts * getComboMultiplier());
+                if (doubleScoreActive) pts *= 2;
+                score += pts;
+                document.getElementById('score-display').textContent = score;
+                showHitEffect(x, y, '#ffd700');
+                showScorePopup(x, y, '+' + pts, '#ffd700');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xffd700, 20);
+                playWhackSound();
+                setMoleHitExpression(moleData.mesh, type);
+            } else if (type === 'fire') {
+                // Fire mole - part of boss battle interference
+                playWhackSound();
+                combo++;
+                lastHitTime = Date.now();
+                comboTimer = 0;
+                let pts = 10;
+                pts = Math.floor(pts * getComboMultiplier());
+                if (doubleScoreActive) pts *= 2;
+                score += pts;
+                document.getElementById('score-display').textContent = score;
+                showHitEffect(x, y, '#ff4500');
+                showScorePopup(x, y, '+' + pts, '#ff4500');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 15);
+                setMoleHitExpression(moleData.mesh, type);
+            } else {
+                playWhackSound();
+                combo++;
+                lastHitTime = Date.now();
+                comboTimer = 0;
+                let pts = 10;
+                pts = Math.floor(pts * getComboMultiplier());
+                if (doubleScoreActive) pts *= 2;
+                score += pts;
+                document.getElementById('score-display').textContent = score;
+                showHitEffect(x, y, '#ff6b6b');
+                showScorePopup(x, y, '+' + pts, '#ff6b6b');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xff6b6b, 15);
+                setMoleHitExpression(moleData.mesh, type);
+            }
+
+            updateComboDisplay();
+
+            if (score >= 10 && score > lastMilestone) {
+                lastMilestone = score;
+                playMilestoneSound();
+                showPraise(praises[praiseIndex % praises.length]);
+                praiseIndex++;
+            }
+
             const mole = moleData.mesh;
             const duration = 200;
             const startTime = Date.now();
@@ -1163,99 +1807,248 @@
             animateWhack();
         }
 
-        // Miss
-        function miss() {
-            combo = 0;
-        }
-
-        function updateScoreDisplay() {
-            document.getElementById('score-display').textContent = score;
-        }
-
-        function showHitEffect(moleData) {
-            const pos = moleData.mesh.position.clone();
-            pos.y = 1;
-            const screenPos = pos.project(camera);
-            const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-            const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
-            
+        function showHitEffect(x, y, color = '#c44') {
             const effect = document.createElement('div');
             effect.className = 'hit-effect';
             effect.style.left = x + 'px';
             effect.style.top = y + 'px';
+            effect.style.borderColor = color;
             document.body.appendChild(effect);
             setTimeout(() => effect.remove(), 400);
         }
 
-        // Raycaster
+        // ============ INPUT ============
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
+        const crosshairEl = document.getElementById('crosshair');
 
         function onMouseMove(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            
-            const crosshair = document.getElementById('crosshair');
-            crosshair.style.left = event.clientX + 'px';
-            crosshair.style.top = event.clientY + 'px';
+            crosshairEl.style.left = event.clientX + 'px';
+            crosshairEl.style.top = event.clientY + 'px';
+        }
+
+        function onMouseDown(event) {
+            if (!gameRunning || gamePaused) return;
+            crosshairEl.classList.add('slam');
+        }
+        function onMouseUp(event) {
+            crosshairEl.classList.remove('slam');
         }
 
         function onClick(event) {
-            if (!gameRunning || currentScreen !== 'playing') return;
+            if (!gameRunning || gamePaused) return;
+            totalClicks++;
+            crosshairEl.classList.add('slam');
+            setTimeout(() => crosshairEl.classList.remove('slam'), 100);
             
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children, true);
+            const intersects = raycaster.intersectObjects(scene3.children, true);
             
-            let hit = false;
+            let hitSomething = false;
+            
             for (const intersect of intersects) {
                 let obj = intersect.object;
-                while (obj.parent && !obj.userData.isMole) {
+                while (obj.parent && !obj.userData?.isMole && !obj.userData?.isPowerup && !obj.userData?.isBoss) {
                     obj = obj.parent;
                 }
-                if (obj.userData.isMole && !obj.userData.hit) {
+                
+                // Check boss hit
+                if (obj.userData?.isBoss && bossActive) {
+                    damageBoss();
+                    hitSomething = true;
+                    break;
+                }
+                
+                if (obj.userData?.isMole && !obj.userData.hit) {
                     const moleData = moles.find(m => m.mesh === obj);
                     if (moleData && !moleData.hit && moleData.state !== 'hiding') {
                         whackMole(moleData);
-                        hit = true;
+                        hitSomething = true;
+                        break;
+                    }
+                }
+                if (obj.userData?.isPowerup && !obj.userData.hit) {
+                    const moleData = moles.find(m => m.mesh === obj);
+                    if (moleData && !moleData.hit) {
+                        whackMole(moleData);
+                        hitSomething = true;
                         break;
                     }
                 }
             }
-            
-            if (!hit && selectedInstantItem === 'super' && instantItemUsed.super < 5) {
-                // Super hammer always hits nearest mole
-                let nearest = null, nearestDist = Infinity;
-                moles.forEach(m => {
-                    if (!m.hit) {
-                        let d = m.mesh.position.distanceTo(new THREE.Vector3(mouse.x, mouse.y, 0));
-                        if (d < nearestDist) {
-                            nearestDist = d;
-                            nearest = m;
-                        }
+
+            // Miss penalty in boss battle
+            if (!hitSomething && bossActive) {
+                // Missed click during boss battle
+                if (fireShieldActive) {
+                    fireShieldActive = false;
+                    document.getElementById('badge-shield').classList.remove('active');
+                    showScorePopup(event.clientX, event.clientY, '护盾抵挡！', '#ff4500');
+                } else {
+                    // Boss heals
+                    if (bossHP < bossMaxHP) {
+                        bossHP++;
+                        updateBossUI();
+                        showScorePopup(event.clientX, event.clientY, 'Boss回复！', '#ff0000');
                     }
-                });
-                if (nearest) {
-                    whackMole(nearest);
-                    hit = true;
                 }
             }
-            
-            if (!hit) miss();
         }
 
         window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mouseup', onMouseUp);
         window.addEventListener('click', onClick);
 
-        // Game loop
+        // Pause button
+        document.getElementById('pause-btn').addEventListener('click', togglePause);
+        document.getElementById('resume-btn').addEventListener('click', togglePause);
+        document.getElementById('quit-btn').addEventListener('click', goToStart);
+
+        function togglePause() {
+            if (!gameRunning) return;
+            gamePaused = !gamePaused;
+            playPauseSound();
+            
+            if (gamePaused) {
+                pausedTime = Date.now();
+                document.getElementById('pause-overlay').style.display = 'flex';
+                document.getElementById('pause-btn').textContent = '▶';
+            } else {
+                totalPausedTime += Date.now() - pausedTime;
+                document.getElementById('pause-overlay').style.display = 'none';
+                document.getElementById('pause-btn').textContent = '⏸';
+            }
+        }
+
+        function goToStart() {
+            gamePaused = false;
+            gameRunning = false;
+            bossActive = false;
+            document.getElementById('pause-overlay').style.display = 'none';
+            document.getElementById('game-over-screen').style.display = 'none';
+            document.getElementById('level-clear-overlay').style.display = 'none';
+            document.getElementById('boss-victory').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+            document.getElementById('crosshair').style.display = 'none';
+            document.getElementById('pause-btn').style.display = 'none';
+            document.getElementById('combo-bar-container').style.display = 'none';
+            document.getElementById('boss-hp-container').style.display = 'none';
+            document.getElementById('boss-hp-text').style.display = 'none';
+            document.getElementById('boss-hit-counter').style.display = 'none';
+            if (bossMesh) bossMesh.visible = false;
+        }
+
+        // ============ WORLD/LEVEL SELECTION ============
+        function showWorldSelect() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('world-select-screen').style.display = 'flex';
+            
+            const container = document.getElementById('world-container');
+            container.innerHTML = '';
+            
+            const data = getSaveData();
+            
+            for (let w = 0; w < TOTAL_WORLDS; w++) {
+                const unlocked = isWorldUnlocked(w);
+                const worldDiv = document.createElement('div');
+                worldDiv.className = `world-box world-${WORLD_THEMES[w].name.split('-')[1]} ${unlocked ? '' : 'locked'}`;
+                
+                const title = document.createElement('h3');
+                title.textContent = `世界${w + 1}: ${WORLDS[w]}`;
+                worldDiv.appendChild(title);
+                
+                if (unlocked) {
+                    const isBossWorld = w === 3;
+                    const levelsDiv = document.createElement('div');
+                    levelsDiv.className = 'levels';
+                    
+                    const levelsPerWorld = isBossWorld ? 1 : LEVELS_PER_WORLD;
+                    
+                    for (let l = 0; l < levelsPerWorld; l++) {
+                        const levelBtn = document.createElement('div');
+                        levelBtn.className = 'level-dot';
+                        
+                        if (isBossWorld) {
+                            // Boss level
+                            const bossDefeated = isBossDefeated(w);
+                            levelBtn.className += bossDefeated ? ' completed' : ' current';
+                            levelBtn.textContent = 'B';
+                            levelBtn.title = bossDefeated ? '已击败' : 'Boss战';
+                            levelBtn.onclick = () => startBossLevel(w);
+                        } else {
+                            const stars = getLevelStars(w, l);
+                            const currentLevelInWorld = data.levels[w] ? data.levels[w].findIndex(s => s === 0) : 0;
+                            if (stars > 0) {
+                                levelBtn.className += ' completed';
+                            } else if (l === currentLevelInWorld || (currentLevelInWorld === -1 && l === 0)) {
+                                levelBtn.className += ' current';
+                            } else {
+                                levelBtn.className += ' locked';
+                            }
+                            levelBtn.textContent = l + 1;
+                            levelBtn.onclick = () => startLevel(w, l);
+                        }
+                        
+                        levelsDiv.appendChild(levelBtn);
+                    }
+                    worldDiv.appendChild(levelsDiv);
+                } else {
+                    const lockedText = document.createElement('p');
+                    lockedText.style.color = '#fff';
+                    lockedText.style.fontSize = '12px';
+                    lockedText.textContent = '未解锁';
+                    worldDiv.appendChild(lockedText);
+                }
+                
+                container.appendChild(worldDiv);
+            }
+        }
+
+        document.getElementById('back-to-start').addEventListener('click', () => {
+            document.getElementById('world-select-screen').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+        });
+
+        document.getElementById('world-btn').addEventListener('click', showWorldSelect);
+        document.getElementById('world-select-btn').addEventListener('click', showWorldSelect);
+
+        // ============ GAME LOOP ============
         let lastSpawnTime = 0;
-        let spawnInterval = 1200;
 
         function spawnLoop(time) {
-            if (gameRunning && time - lastSpawnTime > spawnInterval) {
+            if (gameRunning && !gamePaused && time - lastSpawnTime > spawnInterval) {
                 const available = holes.map((h, i) => i).filter(i => !holes[i].occupied);
                 if (available.length > 0) {
                     const holeIndex = available[Math.floor(Math.random() * available.length)];
-                    showMole(holeIndex);
+                    const rand = Math.random();
+                    
+                    // Boss battle spawns fire moles as interference
+                    if (bossActive) {
+                        if (rand < 0.15) showMole(holeIndex, 'fire');
+                        else if (rand < 0.25) showPowerup(holeIndex, 'fireShield');
+                        else if (rand < 0.30) showPowerup(holeIndex, 'freeze');
+                        else showMole(holeIndex, 'normal');
+                    } else {
+                        // Normal spawning based on world
+                        if (worldIdx === 3) {
+                            // Lava world - more fire moles
+                            if (rand < 0.12) showMole(holeIndex, 'golden');
+                            else if (rand < 0.20) showMole(holeIndex, 'bomb');
+                            else if (rand < 0.23) showMole(holeIndex, 'fire');
+                            else if (rand < 0.26) showPowerup(holeIndex, 'fireShield');
+                            else if (rand < 0.28) showPowerup(holeIndex, 'lavaFreeze');
+                            else showMole(holeIndex, 'normal');
+                        } else {
+                            if (rand < 0.08) showMole(holeIndex, 'golden');
+                            else if (rand < 0.16) showMole(holeIndex, 'bomb');
+                            else if (rand < 0.19) showPowerup(holeIndex, 'double');
+                            else if (rand < 0.22) showPowerup(holeIndex, 'freeze');
+                            else showMole(holeIndex, 'normal');
+                        }
+                    }
                     lastSpawnTime = time;
                 }
             }
@@ -1263,228 +2056,330 @@
         }
         requestAnimationFrame(spawnLoop);
 
-        // Mole timeout
+        // Game tick
         setInterval(() => {
-            if (!gameRunning) return;
+            if (!gameRunning || gamePaused) return;
+
+            if (combo > 0) {
+                comboTimer++;
+                updateComboBar();
+                if (comboTimer >= comboTimeout) showComboBreak();
+            }
+
             moles.forEach(moleData => {
-                if (moleData.hit) return;
+                if (moleData.hit || moleData.isPowerup) return;
                 moleData.timer++;
-                if (moleData.timer > 60) {
+                if (!freezeActive && moleData.timer > moleDuration) {
                     moleData.state = 'hiding';
                     hideMole(moleData);
                 }
             });
         }, 16);
 
-        // Render loop
         function animate() {
             requestAnimationFrame(animate);
+            updateParticles();
+            updateLavaParticles();
             
-            if (currentScreen === 'playing') {
-                renderer.render(scene, camera);
-            }
+            // Rotate lava particles
+            lavaParticles.forEach(p => {
+                p.mesh.rotation.x += 0.01;
+                p.mesh.rotation.y += 0.02;
+            });
+            
+            renderer.render(scene3, camera);
         }
         animate();
 
-        // Game functions
-        function startClassicGame() {
-            score = 0;
-            combo = 0;
-            timeLeft = 30;
-            gameRunning = true;
-            currentWorld = 0;
-            selectedInstantItem = null;
-            instantItemUsed = { slow: false, double: false, super: 0 };
+        // ============ LEVEL FLOW ============
+        function startLevel(worldIdx, levelIdx) {
+            currentWorld = worldIdx;
+            currentLevel = levelIdx;
+            levelMode = 'normal';
             
-            createGround(WORLD_THEMES[0]);
-            createGrassPatches(WORLD_THEMES[0]);
+            setWorldTheme(worldIdx);
             
-            document.getElementById('info').style.display = 'flex';
-            document.getElementById('score-display').textContent = '0';
-            document.getElementById('time-display').textContent = '30';
-            document.getElementById('crosshair').style.display = 'block';
+            const config = getLevelConfig(worldIdx, levelIdx);
+            spawnInterval = config.spawnInterval;
+            moleDuration = config.moleDuration;
             
-            clearMoles();
+            startGame(config.timeLimit);
             
-            gameTimer = setInterval(() => {
-                timeLeft--;
-                document.getElementById('time-display').textContent = timeLeft;
-                if (timeLeft <= 0) {
-                    endClassicGame();
-                }
-            }, 1000);
+            document.getElementById('level-display').textContent = `${worldIdx + 1}-${levelIdx + 1}`;
+            document.getElementById('world-select-screen').style.display = 'none';
         }
 
-        function startLevelGame(world, level) {
-            score = 0;
-            combo = 0;
-            timeLeft = 45;
-            gameRunning = true;
-            currentWorld = world;
-            currentLevel = level;
-            instantItemUsed = { slow: false, double: false, super: 0 };
+        function startBossLevel(worldIdx) {
+            currentWorld = worldIdx;
+            currentLevel = 9; // Last level
+            levelMode = 'boss';
             
-            createGround(WORLD_THEMES[world]);
-            createGrassPatches(WORLD_THEMES[world]);
+            setWorldTheme(worldIdx);
             
-            document.getElementById('info').style.display = 'flex';
-            document.getElementById('score-display').textContent = '0';
-            document.getElementById('time-display').textContent = '45';
-            document.getElementById('crosshair').style.display = 'block';
+            // Boss settings
+            const data = getSaveData();
+            bossHP = data.bossHP > 0 ? data.bossHP : 10;
+            bossMaxHP = 10;
+            bossHitCount = 0;
+            bossActive = false;
             
-            clearMoles();
+            spawnInterval = 1000;
+            moleDuration = 50;
             
-            gameTimer = setInterval(() => {
-                timeLeft--;
-                document.getElementById('time-display').textContent = timeLeft;
-                if (timeLeft <= 0) {
-                    endLevelGame();
+            startGame(45); // 45 seconds for boss fight
+            
+            document.getElementById('level-display').textContent = `${worldIdx + 1}-Boss`;
+            document.getElementById('world-select-screen').style.display = 'none';
+            
+            // Show boss after 2 seconds
+            setTimeout(() => {
+                if (gameRunning) {
+                    showBoss();
                 }
-            }, 1000);
+            }, 2000);
         }
 
-        function clearMoles() {
-            moles.forEach(m => {
-                if (m.mesh.parent) scene.remove(m.mesh);
-            });
+        function startGame(time) {
+            score = 0;
+            timeLeft = time;
+            gameRunning = true;
+            gamePaused = false;
+            lastMilestone = 0;
+            praiseIndex = 0;
+            combo = 0;
+            comboTimer = 0;
+            lastHitTime = 0;
+            totalClicks = 0;
+            totalHits = 0;
+            bestCombo = 0;
+            gameStartTime = Date.now();
+            totalPausedTime = 0;
+            doubleScoreActive = false;
+            freezeActive = false;
+            fireShieldActive = false;
+            if (doubleScoreTimer) clearTimeout(doubleScoreTimer);
+            if (freezeTimer) clearTimeout(freezeTimer);
+            if (shieldTimer) clearTimeout(shieldTimer);
+            
+            document.getElementById('score-display').textContent = '0';
+            document.getElementById('time-display').textContent = timeLeft;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-over-screen').style.display = 'none';
+            document.getElementById('level-clear-overlay').style.display = 'none';
+            document.getElementById('boss-victory').style.display = 'none';
+            document.getElementById('crosshair').style.display = 'block';
+            document.getElementById('pause-btn').style.display = 'block';
+            document.getElementById('pause-btn').textContent = '⏸';
+            document.getElementById('combo-display').style.display = 'none';
+            document.getElementById('combo-bar-container').style.display = 'block';
+            document.getElementById('badge-double').classList.remove('active');
+            document.getElementById('badge-freeze').classList.remove('active');
+            document.getElementById('badge-shield').classList.remove('active');
+            document.getElementById('boss-hp-container').style.display = 'none';
+            document.getElementById('boss-hp-text').style.display = 'none';
+            document.getElementById('boss-hit-counter').style.display = 'none';
+            
+            moles.forEach(m => { if (m.mesh.parent) scene3.remove(m.mesh); });
             moles = [];
             holes.forEach(h => { h.occupied = false; h.mole = null; });
+            
+            // Clear any remaining lava particles
+            lavaParticles.forEach(p => lavaParticleGroup.remove(p.mesh));
+            lavaParticles.length = 0;
+            
+            gameTimer = setInterval(() => {
+                if (gamePaused) return;
+                timeLeft--;
+                document.getElementById('time-display').textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    if (levelMode === 'boss') {
+                        endBossBattle();
+                    } else {
+                        endLevel();
+                    }
+                }
+            }, 1000);
         }
 
-        function endClassicGame() {
+        function endLevel() {
             gameRunning = false;
             clearInterval(gameTimer);
             document.getElementById('crosshair').style.display = 'none';
+            document.getElementById('pause-btn').style.display = 'none';
+            document.getElementById('combo-bar-container').style.display = 'none';
+            document.getElementById('pause-overlay').style.display = 'none';
+            document.getElementById('boss-hp-container').style.display = 'none';
+            document.getElementById('boss-hp-text').style.display = 'none';
+            document.getElementById('boss-hit-counter').style.display = 'none';
+
+            const finalScore = score;
+            const config = getLevelConfig(currentWorld, currentLevel);
+            const isNewRecord = finalScore > getSaveData().highScore;
             
-            let coins = Math.floor(score / 10);
-            gameData.coins += coins;
-            saveGame();
+            const data = getSaveData();
+            if (isNewRecord) {
+                data.highScore = finalScore;
+                saveSaveData(data);
+            }
+
+            // Calculate stars based on score threshold
+            const stars = finalScore >= config.scoreThreshold * 3 ? 3 
+                : finalScore >= config.scoreThreshold * 2 ? 2 
+                : finalScore >= config.scoreThreshold ? 1 : 0;
             
-            lastGameResult = {
-                title: '时间到！',
-                score: score,
-                coins: coins,
-                mode: 'classic'
-            };
-            currentScreen = 'gameover';
+            // Save progress
+            if (stars > 0) {
+                setLevelStars(currentWorld, currentLevel, stars);
+            }
+
+            // Show level clear or game over
+            if (stars > 0) {
+                playLevelUpSound();
+                document.getElementById('level-clear-title').textContent = '关卡通过！';
+                document.getElementById('level-final-score').textContent = finalScore;
+                
+                const starsDiv = document.getElementById('level-stars');
+                starsDiv.textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+                
+                document.getElementById('level-clear-overlay').style.display = 'flex';
+                
+                // Check if next level exists
+                const isLastLevel = currentLevel >= LEVELS_PER_WORLD - 1;
+                document.getElementById('next-level-btn').style.display = isLastLevel ? 'none' : 'inline-block';
+            } else {
+                showGameOver(finalScore, isNewRecord);
+            }
+            
+            moles.forEach(m => { if (!m.hit) hideMole(m); });
         }
 
-        function endLevelGame() {
+        function endBossBattle() {
             gameRunning = false;
+            bossActive = false;
             clearInterval(gameTimer);
             document.getElementById('crosshair').style.display = 'none';
+            document.getElementById('pause-btn').style.display = 'none';
+            document.getElementById('combo-bar-container').style.display = 'none';
+            document.getElementById('pause-overlay').style.display = 'none';
+            document.getElementById('boss-hp-container').style.display = 'none';
+            document.getElementById('boss-hp-text').style.display = 'none';
+            document.getElementById('boss-hit-counter').style.display = 'none';
             
-            let stars = 0;
-            if (score >= STAR_THRESHOLDS[0]) stars = 1;
-            if (score >= STAR_THRESHOLDS[1]) stars = 2;
-            if (score >= STAR_THRESHOLDS[2]) stars = 3;
+            if (bossMesh) bossMesh.visible = false;
+
+            // Boss battle failed - still can get stars based on score
+            const finalScore = score;
+            const stars = finalScore >= 1500 ? 3 : finalScore >= 1000 ? 2 : finalScore >= 500 ? 1 : 0;
             
-            // Save best stars
-            if (stars > gameData.levels[currentWorld][currentLevel]) {
-                gameData.levels[currentWorld][currentLevel] = stars;
-            }
-            
-            // Check world unlock
-            if (currentWorld === 0 && isWorldComplete(0) && !gameData.unlockedWorlds[1]) {
-                gameData.unlockedWorlds[1] = true;
-            }
-            if (currentWorld === 1 && isWorldComplete(1) && !gameData.unlockedWorlds[2]) {
-                gameData.unlockedWorlds[2] = true;
-            }
-            
-            let coins = Math.floor(score / 10);
-            gameData.coins += coins;
-            saveGame();
-            
-            lastGameResult = {
-                title: stars >= 1 ? '🎉 过关！' : '😢 未过关',
-                score: score,
-                stars: stars,
-                coins: coins,
-                mode: 'level',
-                world: currentWorld,
-                level: currentLevel
-            };
-            currentScreen = 'gameover';
+            showGameOver(finalScore, false);
+            moles.forEach(m => { if (!m.hit) hideMole(m); });
         }
 
-        // Audio
-        let audioCtx;
-        function initAudio() {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function showGameOver(finalScore, isNewRecord) {
+            const isRecord = finalScore > getSaveData().highScore;
+            if (isRecord) {
+                const data = getSaveData();
+                data.highScore = finalScore;
+                saveSaveData(data);
+            }
+
+            const effectiveTime = Math.floor((Date.now() - gameStartTime - totalPausedTime) / 1000);
+            const accuracy = totalClicks > 0 ? Math.round((totalHits / totalClicks) * 100) : 0;
+
+            document.getElementById('final-score').textContent = finalScore;
+            document.getElementById('stat-accuracy').textContent = accuracy + '%';
+            document.getElementById('stat-combo').textContent = bestCombo + 'x';
+            document.getElementById('stat-hits').textContent = totalHits;
+            document.getElementById('stat-time').textContent = effectiveTime + 's';
+
+            const recordBadge = document.getElementById('high-score-badge-end');
+            recordBadge.style.display = isRecord ? 'block' : 'none';
+
+            document.getElementById('game-over-screen').style.display = 'flex';
         }
 
-        function playWhackSound() {
-            if (!audioCtx) initAudio();
-            if (!gameData.settings.sound) return;
+        // Next level button
+        document.getElementById('next-level-btn').addEventListener('click', () => {
+            document.getElementById('level-clear-overlay').style.display = 'none';
+            const nextLevel = currentLevel + 1;
+            if (nextLevel < LEVELS_PER_WORLD) {
+                startLevel(currentWorld, nextLevel);
+            }
+        });
+
+        document.getElementById('level-to-world-btn').addEventListener('click', () => {
+            document.getElementById('level-clear-overlay').style.display = 'none';
+            showWorldSelect();
+        });
+
+        // Boss buttons
+        document.getElementById('boss-next-btn').addEventListener('click', () => {
+            document.getElementById('boss-victory').style.display = 'none';
+            // Continue to next world or replay
+            if (currentWorld < TOTAL_WORLDS - 1) {
+                startLevel(currentWorld + 1, 0);
+            } else {
+                showWorldSelect();
+            }
+        });
+
+        document.getElementById('boss-to-world-btn').addEventListener('click', () => {
+            document.getElementById('boss-victory').style.display = 'none';
+            showWorldSelect();
+        });
+
+        // Initialize high score display
+        document.getElementById('high-score-val').textContent = getSaveData().highScore;
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            // Start from first unlocked level
+            const data = getSaveData();
+            let startWorld = 0;
+            let startLevelIdx = 0;
             
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
-        }
+            for (let w = 0; w < TOTAL_WORLDS; w++) {
+                if (isWorldUnlocked(w)) {
+                    startWorld = w;
+                    const levelData = data.levels[w];
+                    if (levelData) {
+                        const firstZero = levelData.findIndex(s => s === 0);
+                        if (firstZero > 0) {
+                            startLevelIdx = firstZero;
+                        } else if (firstZero === -1) {
+                            startLevelIdx = LEVELS_PER_WORLD - 1;
+                        }
+                    }
+                }
+            }
+            
+            if (startWorld === 3 && isBossDefeated(3)) {
+                // Boss already defeated, start from world 4 level 1
+                startLevel(startWorld, 0);
+            } else if (startWorld === 3) {
+                // Start boss level
+                startBossLevel(startWorld);
+            } else {
+                startLevel(startWorld, startLevelIdx);
+            }
+        });
 
-        // Window resize
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            if (levelMode === 'boss') {
+                startBossLevel(currentWorld);
+            } else {
+                startLevel(currentWorld, currentLevel);
+            }
+        });
+
+        document.getElementById('home-btn').addEventListener('click', goToStart);
+
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            resizeUI();
         });
 
-        // Hide cursor initially
         document.body.style.cursor = 'none';
-
-        // ==================== INFO BAR ====================
-        const infoDiv = document.createElement('div');
-        infoDiv.id = 'info';
-        infoDiv.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);color:#ffd700;font-size:28px;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.5);z-index:100;display:none;gap:40px;';
-        infoDiv.innerHTML = '<span>得分: <b id="score-display">0</b></span><span>时间: <b id="time-display">30</b>s</span>';
-        document.body.appendChild(infoDiv);
-
-        // ==================== UI RENDER LOOP ====================
-        let hoveredBtn = -1;
-        
-        function renderUI() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            if (currentScreen === 'menu') drawMenuScreen();
-            else if (currentScreen === 'modeSelect') drawModeSelectScreen();
-            else if (currentScreen === 'instantItemSelect') drawInstantItemSelectScreen();
-            else if (currentScreen === 'levelSelect') drawLevelSelectScreen();
-            else if (currentScreen === 'shop') drawShopScreen();
-            else if (currentScreen === 'collection') drawCollectionScreen();
-            else if (currentScreen === 'gameover') drawGameOverScreen();
-            
-            requestAnimationFrame(renderUI);
-        }
-        renderUI();
-
-        // Mouse events for UI
-        canvas.addEventListener('mousemove', (e) => {
-            hoveredBtn = -1;
-            uiButtons.forEach((btn, i) => {
-                if (isPointInButton(e.clientX, e.clientY, btn)) hoveredBtn = i;
-            });
-            canvas.style.pointerEvents = hoveredBtn >= 0 ? 'auto' : 'none';
-            document.body.style.cursor = hoveredBtn >= 0 ? 'pointer' : 'none';
-        });
-
-        canvas.addEventListener('click', (e) => {
-            if (hoveredBtn >= 0 && uiButtons[hoveredBtn]) {
-                uiButtons[hoveredBtn].action();
-                hoveredBtn = -1;
-            }
-        });
-
-        // Initialize
-        document.getElementById('info').style.display = 'none';
     </script>
 </body>
 </html>
