@@ -816,6 +816,11 @@
         let freezeTimer = null;
         let shieldTimer = null;
 
+        // ============ THREE.JS SETUP ============
+        const scene3 = new THREE.Scene();
+        scene3.background = new THREE.Color(WORLD_THEMES[0].bg);
+        scene3.fog = new THREE.Fog(WORLD_THEMES[0].fog, 15, 35);
+
         // ============ PARTICLE SYSTEM ============
         const particles = [];
         const particleGroup = new THREE.Group();
@@ -904,11 +909,6 @@
                 }
             }
         }
-
-        // ============ THREE.JS SETUP ============
-        const scene3 = new THREE.Scene();
-        scene3.background = new THREE.Color(WORLD_THEMES[0].bg);
-        scene3.fog = new THREE.Fog(WORLD_THEMES[0].fog, 15, 35);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 8, 10);
