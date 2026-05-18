@@ -3171,6 +3171,107 @@
             );
         }
 
+        // ============ MOLE ANIMATION STATE MACHINE (A8) ============
+        class MoleAnimator {
+            constructor(mesh, moleData) {
+                this.mesh = mesh;
+                this.moleData = moleData;
+                this.state = 'idle';
+                this.animations = {};
+                this.currentAnim = null;
+                this.time = 0;
+            }
+            
+            // Easing functions
+            static easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+            static easeInOutBack(t) {
+                const c1 = 1.70158, c2 = c1 * 1.525;
+                return t < 0.5
+                    ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+                    : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
+            }
+            static easeOutElastic(t) {
+                if (t === 0 || t === 1) return t;
+                return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * (2 * Math.PI) / 3) + 1;
+            }
+            static easeOutBounce(t) {
+                const n1 = 7.5625, d1 = 2.75;
+                if (t < 1 / d1) return n1 * t * t;
+                if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
+                if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
+                return n1 * (t -= 2.625 / d1) * t + 0.984375;
+            }
+            
+            // Animation presets
+            static presets = {
+                rise: { duration: 400, y: { from: -1, to: 0.6 }, ease: 'easeOutCubic' },
+                hide: { duration: 300, y: { from: 0, to: -1.2 }, ease: 'easeInOutBack' },
+                whack: { duration: 200, y: { from: 0, to: -0.5 }, scale: { from: 1, to: 0.7 }, ease: 'easeOutElastic' },
+                wobble: { duration: 600, rotationY: { amplitude: 0.3, frequency: 8 }, ease: 'sine' },
+                idle: { duration: 1000, y: { amplitude: 0.05, frequency: 2 }, ease: 'sine' },
+                hitReact: { duration: 300, scale: { from: 1.2, to: 1 }, ease: 'easeOutElastic' }
+            };
+            
+            play(presetName, onComplete) {
+                const preset = MoleAnimator.presets[presetName];
+                if (!preset) return;
+                
+                this.currentAnim = {
+                    name: presetName,
+                    startTime: Date.now(),
+                    duration: preset.duration,
+                    ease: preset.ease,
+                    onComplete
+                };
+                this.state = presetName;
+            }
+            
+            update() {
+                if (!this.currentAnim) return;
+                
+                const anim = this.currentAnim;
+                const elapsed = Date.now() - anim.startTime;
+                let t = Math.min(elapsed / anim.duration, 1);
+                
+                // Apply easing
+                if (anim.ease === 'easeOutCubic') t = MoleAnimator.easeOutCubic(t);
+                else if (anim.ease === 'easeInOutBack') t = MoleAnimator.easeInOutBack(t);
+                else if (anim.ease === 'easeOutElastic') t = MoleAnimator.easeOutElastic(t);
+                else if (anim.ease === 'easeOutBounce') t = MoleAnimator.easeOutBounce(t);
+                
+                const preset = MoleAnimator.presets[anim.name];
+                
+                // Apply transforms based on preset
+                if (preset.y) {
+                    if (preset.y.amplitude !== undefined) {
+                        // Oscillating motion
+                        this.mesh.position.y = preset.y.to + Math.sin(t * Math.PI * 2 * (preset.y.frequency || 1)) * preset.y.amplitude;
+                    } else {
+                        this.mesh.position.y = preset.y.from + (preset.y.to - preset.y.from) * t;
+                    }
+                }
+                if (preset.scale) {
+                    const s = preset.scale.from + (preset.scale.to - preset.scale.from) * t;
+                    this.mesh.scale.set(s, s * 0.8, s);
+                }
+                if (preset.rotationY && preset.rotationY.amplitude) {
+                    this.mesh.rotation.y = Math.sin(t * Math.PI * 2 * preset.rotationY.frequency) * preset.rotationY.amplitude;
+                }
+                
+                // Check completion
+                if (elapsed >= anim.duration) {
+                    if (anim.onComplete) anim.onComplete();
+                    this.currentAnim = null;
+                    this.state = 'idle';
+                }
+            }
+            
+            stop() {
+                this.currentAnim = null;
+                this.state = 'idle';
+            }
+        }
+        
         // ============ MOLE CREATION (registry-driven, A6 skin-aware) ============
         function createMole(type = 'normal') {
             const moleGroup = new THREE.Group();
@@ -3357,22 +3458,19 @@
             
             holes[holeIndex].occupied = true;
             holes[holeIndex].mole = mole;
-            moles.push({ mesh: mole, holeIndex, state: 'rising', timer: 0, hit: false, moleType: type, isPowerup: false });
-
-            const targetY = 0.6;
-            const duration = 400;
-            const startTime = Date.now();
-            const startY = -1;
             
-            function animateRise() {
-                if (!gameRunning || mole.userData.hit) return;
-                const elapsed = Date.now() - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                const eased = 1 - Math.pow(1 - progress, 3) * Math.cos(progress * Math.PI * 0.5);
-                mole.position.y = startY + (targetY - startY) * eased;
-                if (progress < 1) requestAnimationFrame(animateRise);
-            }
-            animateRise();
+            const moleData = { mesh: mole, holeIndex, state: 'rising', timer: 0, hit: false, moleType: type, isPowerup: false };
+            mole.userData.animator = new MoleAnimator(mole, moleData);
+            moles.push(moleData);
+
+            // A8: Use MoleAnimator for rise animation
+            mole.userData.animator.play('rise', () => {
+                if (gameRunning && !moleData.hit) {
+                    moleData.state = 'visible';
+                    // Play wobble idle animation
+                    mole.userData.animator.play('wobble');
+                }
+            });
         }
 
         function showPowerup(holeIndex, type) {
@@ -3419,23 +3517,12 @@
             holes[holeIndex].occupied = false;
             holes[holeIndex].mole = null;
             
-            const duration = 300;
-            const startTime = Date.now();
-            const startY = mole.position.y;
-            
-            function animateHide() {
-                if (!gameRunning) return;
-                const elapsed = Date.now() - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                mole.position.y = startY - progress * 1.2;
-                if (progress < 1) {
-                    requestAnimationFrame(animateHide);
-                } else {
-                    scene3.remove(mole);
-                    moles = moles.filter(m => m !== moleData);
-                }
-            }
-            animateHide();
+            // A8: Use MoleAnimator for hide animation
+            mole.userData.animator.stop();
+            mole.userData.animator.play('hide', () => {
+                scene3.remove(mole);
+                moles = moles.filter(m => m !== moleData);
+            });
         }
 
         // ============ UI HELPERS ============
@@ -3761,22 +3848,11 @@
                 praiseIndex++;
             }
 
-            const mole = moleData.mesh;
-            const duration = 200;
-            const startTime = Date.now();
-            
-            function animateWhack() {
-                const elapsed = Date.now() - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                mole.position.y = 0.6 - progress * 1.8;
-                mole.rotation.z = (Math.random() - 0.5) * progress * 0.5;
-                if (progress < 1) {
-                    requestAnimationFrame(animateWhack);
-                } else {
-                    hideMole(moleData);
-                }
-            }
-            animateWhack();
+            // A8: Use MoleAnimator for whack animation
+            mole.userData.animator.stop();
+            mole.userData.animator.play('whack', () => {
+                hideMole(moleData);
+            });
         }
 
         // ============ v3 POWERUP HELPERS ============
@@ -4213,6 +4289,13 @@
             updateParticles();
             updateBlastRings();
             updateLavaParticles();
+
+            // A8: Update mole animators
+            moles.forEach(md => {
+                if (md.mesh.userData.animator) {
+                    md.mesh.userData.animator.update();
+                }
+            });
 
             // A3: Magnet effect - pull visible moles toward center
             if (magnetActive) {
