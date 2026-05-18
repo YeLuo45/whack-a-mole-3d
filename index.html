@@ -148,6 +148,10 @@
         .powerup-magnet { background: #9932cc; color: #fff; }
         .powerup-slow { background: #1e90ff; color: #fff; }
         .powerup-combo { background: #ff1493; color: #fff; }
+        #skill-indicator { position: fixed; top: 10px; right: 10px; display: flex; gap: 8px; z-index: 100; }
+        .skill-badge { font-size: 24px; opacity: 0.3; cursor: default; filter: grayscale(1); transition: all 0.2s; }
+        .skill-badge.ready { opacity: 1; filter: grayscale(0); cursor: pointer; }
+        .skill-badge.active { opacity: 0.7; filter: grayscale(0); transform: scale(1.1); }
 
         /* World/Level Selection */
         #world-select-screen {
@@ -590,6 +594,12 @@
         <span class="powerup-badge powerup-magnet" id="badge-magnet">磁铁</span>
         <span class="powerup-badge powerup-slow" id="badge-slow">减速</span>
         <span class="powerup-badge powerup-combo" id="badge-combo">连击+</span>
+    </div>
+
+    <div id="skill-indicator">
+        <span class="skill-badge" id="skill-goldenFrenzy" title="Q">💰</span>
+        <span class="skill-badge" id="skill-timeFreeze" title="E">⏱</span>
+        <span class="skill-badge" id="skill-bombRush" title="R">💣</span>
     </div>
 
     <div id="combo-bar-container">
@@ -2195,6 +2205,26 @@
         }
         const powerupRegistry = new PowerupRegistry();
 
+        // ============ SKILL REGISTRY (L0-L4 pattern - persistent charged abilities) ============
+        // Skills are press-to-activate abilities with cooldown. L4 = fully charged.
+        class SkillRegistry {
+            constructor() { this._types = {}; this._cooldowns = {}; }
+            register(id, config) {
+                // config: { name, icon, key, cooldown, maxCharges, onActivate(state), getDescription(state) }
+                this._types[id] = { id, charges: config.maxCharges || 1, ...config };
+                this._cooldowns[id] = 0;
+            }
+            get(id) { return this._types[id]; }
+            list() { return Object.values(this._types); }
+            getCooldown(id) { return this._cooldowns[id] || 0; }
+            setCooldown(id, t) { this._cooldowns[id] = t; }
+            isReady(id) { return this._cooldowns[id] <= 0 && (this._types[id]?.charges ?? 0) > 0; }
+            use(id) { if (this._types[id]) this._types[id].charges--; }
+            recharge(id) { if (this._types[id]) this._types[id].charges = this._types[id].maxCharges || 1; }
+            getChargeCount(id) { return this._types[id]?.charges ?? 0; }
+        }
+        const skillRegistry = new SkillRegistry();
+
         // Register built-in powerups
         powerupRegistry.register('double', {
             color: 0xffd700,
@@ -2307,6 +2337,103 @@
                     state.comboBoostActive = false;
                     document.getElementById('badge-combo')?.classList.remove('active');
                 }, state.duration);
+            }
+        });
+
+        // ============ SKILL DEFINITIONS (persistent charged abilities) ============
+        // Skill 1: Golden Frenzy - spawn 5 golden moles instantly, +50pts each
+        skillRegistry.register('goldenFrenzy', {
+            name: 'Golden Frenzy',
+            icon: '💰',
+            key: 'KeyQ',
+            cooldown: 45000,
+            maxCharges: 1,
+            onActivate: (state) => {
+                playGoldenSound();
+                const targets = [];
+                holes.forEach((h, i) => { if (!h.occupied) targets.push(i); });
+                const shuffled = targets.sort(() => Math.random() - 0.5).slice(0, Math.min(5, targets.length));
+                shuffled.forEach(idx => {
+                    showMole(idx, 'golden');
+                    setTimeout(() => {
+                        const m = moles.find(m => m.holeIndex === idx && !m.hit && !m.isPowerup);
+                        if (m) {
+                            const pos = m.mesh.position;
+                            score += 50;
+                            totalHits++;
+                            document.getElementById('score-display').textContent = score;
+                            showScorePopup(pos.x + window.innerWidth/2, pos.y + window.innerHeight/2, '+50', '#ffd700');
+                            spawnHitParticles(pos.x, pos.y, pos.z, 0xffd700, 10);
+                        }
+                    }, 500);
+                });
+                showScorePopup(window.innerWidth/2, window.innerHeight/2, '💰 FRENZY!', '#ffd700');
+            }
+        });
+
+        // Skill 2: Time Freeze - all moles freeze for 3 seconds (no spawn)
+        skillRegistry.register('timeFreeze', {
+            name: 'Time Freeze',
+            icon: '⏱',
+            key: 'KeyE',
+            cooldown: 30000,
+            maxCharges: 2,
+            onActivate: (state) => {
+                playPowerupSound();
+                state.freezeActive = true;
+                document.getElementById('badge-freeze')?.classList.add('active');
+                // Freeze all current moles
+                moles.forEach(md => {
+                    if (!md.hit && !md.isPowerup && md.mesh) {
+                        md.mesh.traverse(c => {
+                            if (c.isMesh && c.material) {
+                                c.material = c.material.clone();
+                                c.material.emissive = new THREE.Color(0x00ffff);
+                                c.material.emissiveIntensity = 0.5;
+                            }
+                        });
+                    }
+                });
+                showScorePopup(window.innerWidth/2, window.innerHeight/2, '⏱ TIME STOP!', '#00ffff');
+                if (state.freezeTimer) clearTimeout(state.freezeTimer);
+                state.freezeTimer = setTimeout(() => {
+                    state.freezeActive = false;
+                    document.getElementById('badge-freeze')?.classList.remove('active');
+                    moles.forEach(md => {
+                        if (!md.hit && !md.isPowerup && md.mesh) {
+                            md.mesh.traverse(c => {
+                                if (c.isMesh && c.material && c.material.emissive) {
+                                    c.material.emissive.setHex(0x000000);
+                                    c.material.emissiveIntensity = 0;
+                                }
+                            });
+                        }
+                    });
+                }, 3000);
+            }
+        });
+
+        // Skill 3: Bomb Rush - hit all visible moles for 10pts each instantly
+        skillRegistry.register('bombRush', {
+            name: 'Bomb Rush',
+            icon: '💣',
+            key: 'KeyR',
+            cooldown: 25000,
+            maxCharges: 2,
+            onActivate: (state) => {
+                playBombSound();
+                moles.forEach(md => {
+                    if (md.hit || md.isPowerup) return;
+                    const pos = md.mesh.position;
+                    md.hit = true;
+                    score += 10;
+                    totalHits++;
+                    showScorePopup(pos.x + window.innerWidth/2, pos.y + window.innerHeight/2, '+10', '#ff4500');
+                    spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 10);
+                    setMoleHitExpression(md.mesh, md.moleType || 'normal');
+                    setTimeout(() => hideMole(md), 200);
+                });
+                showScorePopup(window.innerWidth/2, window.innerHeight/2, '💣 BOMB RUSH!', '#ff4500');
             }
         });
 
@@ -3027,20 +3154,74 @@
         window.addEventListener('mouseup', onMouseUp);
         window.addEventListener('click', onClick);
 
-        // ============ KEYBOARD SKILLS (D/F/S) ============
+        // ============ KEYBOARD SKILLS (D/F/S) & NEW ABILITIES (Q/E/R) ============
         window.addEventListener('keydown', (e) => {
             if (!gameRunning || gamePaused) return;
-            const key = e.key.toUpperCase();
-            if (key === 'D' && !doubleScoreActive) {
+            const key = e.code;
+            // Q/E/R: charged skills
+            if (key === 'KeyQ' && skillRegistry.isReady('goldenFrenzy')) {
+                skillRegistry.use('goldenFrenzy');
+                skillRegistry.setCooldown('goldenFrenzy', skillRegistry.get('goldenFrenzy').cooldown);
+                skillRegistry.get('goldenFrenzy').onActivate({});
+            } else if (key === 'KeyE' && skillRegistry.isReady('timeFreeze')) {
+                skillRegistry.use('timeFreeze');
+                skillRegistry.setCooldown('timeFreeze', skillRegistry.get('timeFreeze').cooldown);
+                skillRegistry.get('timeFreeze').onActivate({ freezeActive, freezeTimer });
+            } else if (key === 'KeyR' && skillRegistry.isReady('bombRush')) {
+                skillRegistry.use('bombRush');
+                skillRegistry.setCooldown('bombRush', skillRegistry.get('bombRush').cooldown);
+                skillRegistry.get('bombRush').onActivate({});
+            } else if (key === 'KeyD' && !doubleScoreActive) {
                 activatePowerup('double');
                 showScorePopup(window.innerWidth / 2, window.innerHeight / 2 - 100, '双倍得分启动！', '#ffd700');
-            } else if (key === 'F' && !freezeActive) {
+            } else if (key === 'KeyF' && !freezeActive) {
                 activatePowerup('freeze');
                 showScorePopup(window.innerWidth / 2, window.innerHeight / 2 - 100, '冰冻启动！', '#4ecdc4');
-            } else if (key === 'S' && !fireShieldActive) {
+            } else if (key === 'KeyS' && !fireShieldActive) {
                 activatePowerup('fireShield');
                 showScorePopup(window.innerWidth / 2, window.innerHeight / 2 - 100, '护盾启动！', '#ff4500');
             }
+        });
+
+        // A4: Skill cooldown ticker - runs in gameLoop
+        const skillCooldownTicks = {}; // skillId -> ms remaining
+        function updateSkillUI() {
+            ['goldenFrenzy', 'timeFreeze', 'bombRush'].forEach(id => {
+                const el = document.getElementById('skill-' + id);
+                if (!el) return;
+                const cd = skillRegistry.getCooldown(id);
+                if (cd > 0) {
+                    el.classList.remove('ready');
+                    el.classList.add('cooldown');
+                    el.textContent = Math.ceil(cd / 1000) + 's';
+                    el.style.filter = 'grayscale(1)';
+                    el.style.opacity = '0.5';
+                } else if (skillRegistry.getChargeCount(id) > 0) {
+                    el.classList.add('ready');
+                    el.classList.remove('cooldown');
+                    const cfg = skillRegistry.get(id);
+                    el.textContent = cfg.icon;
+                    el.style.filter = 'grayscale(0)';
+                    el.style.opacity = '1';
+                } else {
+                    el.classList.remove('ready');
+                    el.textContent = '⏳';
+                    el.style.filter = 'grayscale(1)';
+                    el.style.opacity = '0.3';
+                }
+            });
+        }
+
+        // Skill badge click handlers
+        ['goldenFrenzy', 'timeFreeze', 'bombRush'].forEach(id => {
+            document.getElementById('skill-' + id)?.addEventListener('click', () => {
+                if (!gameRunning || gamePaused) return;
+                if (skillRegistry.isReady(id)) {
+                    skillRegistry.use(id);
+                    skillRegistry.setCooldown(id, skillRegistry.get(id).cooldown);
+                    skillRegistry.get(id).onActivate({ freezeActive, freezeTimer });
+                }
+            });
         });
 
         // Pause button
@@ -3222,6 +3403,13 @@
         setInterval(() => {
             if (!gameRunning || gamePaused) return;
 
+            // A4: Tick skill cooldowns
+            ['goldenFrenzy', 'timeFreeze', 'bombRush'].forEach(id => {
+                const cd = skillRegistry.getCooldown(id);
+                if (cd > 0) skillRegistry.setCooldown(id, Math.max(0, cd - 16));
+            });
+            updateSkillUI();
+
             // Update combo bar with new timer-based approach
             if (combo > 0) {
                 updateComboBar();
@@ -3356,7 +3544,14 @@
             if (slowTimer) clearTimeout(slowTimer);
             if (comboBoostTimer) clearTimeout(comboBoostTimer);
             if (comboTimer) clearTimeout(comboTimer);
-            
+
+            // A4: Recharge all skills
+            ['goldenFrenzy', 'timeFreeze', 'bombRush'].forEach(id => {
+                skillRegistry.recharge(id);
+                skillRegistry.setCooldown(id, 0);
+            });
+            updateSkillUI();
+
             document.getElementById('score-display').textContent = '0';
             document.getElementById('time-display').textContent = timeLeft;
             document.getElementById('start-screen').style.display = 'none';
