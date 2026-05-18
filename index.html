@@ -1570,6 +1570,31 @@
             }
         }
 
+        // A2: Explosive ring effect - torus ring that expands and fades
+        const blastRings = [];
+        function spawnBlastRing(pos) {
+            const geo = new THREE.TorusGeometry(0.3, 0.06, 8, 32);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 1.0, side: THREE.DoubleSide });
+            const ring = new THREE.Mesh(geo, mat);
+            ring.position.copy(pos);
+            ring.rotation.x = Math.PI / 2; // lay flat
+            scene3.add(ring);
+            blastRings.push({ mesh: ring, scale: 1, opacity: 1 });
+        }
+        function updateBlastRings() {
+            for (let i = blastRings.length - 1; i >= 0; i--) {
+                const r = blastRings[i];
+                r.scale += 0.08;
+                r.opacity -= 0.04;
+                r.mesh.scale.setScalar(r.scale);
+                r.mesh.material.opacity = r.opacity;
+                if (r.opacity <= 0) {
+                    scene3.remove(r.mesh);
+                    blastRings.splice(i, 1);
+                }
+            }
+        }
+
         function updateParticles() {
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
@@ -2115,7 +2140,31 @@
             createExtra: null
         });
 
-        // Backward compat alias
+        // ============ A2 NEW MOLE TYPES (createExtra-driven) ============
+        // Invisible mole: transparent body, short appearance, high reward
+        moleRegistry.register('invisible', {
+            color: 0x88ccff, weight: 0.05,
+            hasFace: false, transparent: true, opacity: 0.35,
+            appearDuration: 700, score: 30,
+            createExtra: (group) => {
+                group.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        child.material = child.material.clone();
+                        child.material.transparent = true;
+                        child.material.opacity = 0.35;
+                        child.material.needsUpdate = true;
+                    }
+                });
+            }
+        });
+
+        // Explosive mole: blast ring on hit, damages nearby moles
+        moleRegistry.register('explosive', {
+            color: 0xff2200, emissive: 0xff6600, emissiveIntensity: 0.3,
+            weight: 0.05, score: 20,
+            hasBlast: true,
+            createExtra: null
+        });
         // Backward compat alias
         const MOLE_TYPES = moleRegistry._types;
         function getRandomMoleType() { return moleRegistry.getRandom(); }
@@ -2215,7 +2264,9 @@
                 roughness: cfg.roughness ?? 0.7,
                 metalness: cfg.metalness ?? 0,
                 emissive: cfg.emissive ?? 0x000000,
-                emissiveIntensity: cfg.emissiveIntensity ?? 0
+                emissiveIntensity: cfg.emissiveIntensity ?? 0,
+                transparent: cfg.transparent ?? false,
+                opacity: cfg.opacity ?? 1.0
             });
             const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
             const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -2698,6 +2749,32 @@
                 showScorePopup(x, y, '+' + Math.floor(pts), '#ff4500');
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 15);
                 setMoleHitExpression(moleData.mesh, type);
+            } else if (type === 'invisible') {
+                // A2: Invisible mole - high reward, transparent, doesn't break combo
+                playWhackSound();
+                playComboSound();
+                onMoleHit();
+                let pts = 30;
+                if (doubleScoreActive) pts *= 2;
+                score += pts;
+                totalHits++;
+                document.getElementById('score-display').textContent = score;
+                showHitEffect(x, y, 'rgba(136,204,255,0.8)');
+                showScorePopup(x, y, '+' + Math.floor(pts), '#88ccff');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0x88ccff, 15);
+                setMoleHitExpression(moleData.mesh, type);
+            } else if (type === 'explosive') {
+                // A2: Explosive mole - blast ring on hit, -15 pts
+                playBombSound();
+                showComboBreak();
+                let pts = -15;
+                if (doubleScoreActive) pts *= 2;
+                score += pts;
+                document.getElementById('score-display').textContent = score;
+                showHitEffect(x, y, '#ff2200');
+                showScorePopup(x, y, pts + '', '#ff4444');
+                spawnHitParticles(pos.x, pos.y, pos.z, 0xff2200, 30);
+                spawnBlastRing(pos);
             } else {
                 // Normal mole
                 playWhackSound();
@@ -3063,9 +3140,11 @@
             moles.forEach(moleData => {
                 if (moleData.hit || moleData.isPowerup) return;
                 moleData.timer++;
-                const effectiveDuration = endlessMode 
-                    ? (freezeActive ? endlessMoleDuration * 1.5 : endlessMoleDuration)
-                    : (freezeActive ? moleDuration * 1.5 : moleDuration);
+                const cfg = moleRegistry.get(moleData.type);
+                const baseDur = cfg?.appearDuration
+                    ? cfg.appearDuration / 16   // frames (16ms per tick)
+                    : (endlessMode ? endlessMoleDuration : moleDuration);
+                const effectiveDuration = freezeActive ? baseDur * 1.5 : baseDur;
                 if (moleData.timer > effectiveDuration) {
                     moleData.state = 'hiding';
                     hideMole(moleData);
@@ -3076,6 +3155,7 @@
         function animate() {
             requestAnimationFrame(animate);
             updateParticles();
+            updateBlastRings();
             updateLavaParticles();
             
             // Rotate lava particles
