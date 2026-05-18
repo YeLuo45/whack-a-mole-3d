@@ -145,6 +145,9 @@
         .powerup-double { background: #ffd700; color: #8b6914; }
         .powerup-freeze { background: #4ecdc4; color: #fff; }
         .powerup-shield { background: #ff4500; color: #fff; }
+        .powerup-magnet { background: #9932cc; color: #fff; }
+        .powerup-slow { background: #1e90ff; color: #fff; }
+        .powerup-combo { background: #ff1493; color: #fff; }
 
         /* World/Level Selection */
         #world-select-screen {
@@ -584,6 +587,9 @@
         <span class="powerup-badge powerup-double" id="badge-double">2倍得分</span>
         <span class="powerup-badge powerup-freeze" id="badge-freeze">冻结</span>
         <span class="powerup-badge powerup-shield" id="badge-shield">火焰护盾</span>
+        <span class="powerup-badge powerup-magnet" id="badge-magnet">磁铁</span>
+        <span class="powerup-badge powerup-slow" id="badge-slow">减速</span>
+        <span class="powerup-badge powerup-combo" id="badge-combo">连击+</span>
     </div>
 
     <div id="combo-bar-container">
@@ -1350,9 +1356,15 @@
         let doubleScoreActive = false;
         let freezeActive = false;
         let fireShieldActive = false;
+        let magnetActive = false;
+        let slowActive = false;
+        let comboBoostActive = false;
         let doubleScoreTimer = null;
         let freezeTimer = null;
         let shieldTimer = null;
+        let magnetTimer = null;
+        let slowTimer = null;
+        let comboBoostTimer = null;
 
         // ============ ENDLESS MODE ============
         let endlessMode = false;
@@ -1572,6 +1584,7 @@
 
         // A2: Explosive ring effect - torus ring that expands and fades
         const blastRings = [];
+        let magnetFieldGroup = null;
         function spawnBlastRing(pos) {
             const geo = new THREE.TorusGeometry(0.3, 0.06, 8, 32);
             const mat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 1.0, side: THREE.DoubleSide });
@@ -2229,24 +2242,98 @@
             }
         });
 
+        // A3: Magnet - slows spawn rate, all moles pulled toward center
+        powerupRegistry.register('magnet', {
+            color: 0x9932cc,
+            icon: '🧲',
+            duration: 10000,
+            badgeId: 'badge-magnet',
+            onActivate: (state) => {
+                state.magnetActive = true;
+                document.getElementById('badge-magnet')?.classList.add('active');
+                if (state.magnetTimer) clearTimeout(state.magnetTimer);
+                // A3: Create rotating magnetic field visual
+                if (!magnetFieldGroup) {
+                    magnetFieldGroup = new THREE.Group();
+                    for (let i = 0; i < 3; i++) {
+                        const ringGeo = new THREE.TorusGeometry(2.5 + i * 0.8, 0.04, 8, 64);
+                        const ringMat = new THREE.MeshBasicMaterial({
+                            color: 0x9932cc, transparent: true,
+                            opacity: 0.5 - i * 0.15, side: THREE.DoubleSide
+                        });
+                        const ring = new THREE.Mesh(ringGeo, ringMat);
+                        ring.rotation.x = Math.PI / 2 + i * 0.3;
+                        magnetFieldGroup.add(ring);
+                    }
+                    magnetFieldGroup.position.y = 0.5;
+                    scene3.add(magnetFieldGroup);
+                }
+                state.magnetTimer = setTimeout(() => {
+                    state.magnetActive = false;
+                    document.getElementById('badge-magnet')?.classList.remove('active');
+                    if (magnetFieldGroup) { scene3.remove(magnetFieldGroup); magnetFieldGroup = null; }
+                }, state.duration);
+            }
+        });
+
+        // A3: Slow - halves mole speed, extends durations
+        powerupRegistry.register('slow', {
+            color: 0x1e90ff,
+            icon: '🐌',
+            duration: 8000,
+            badgeId: 'badge-slow',
+            onActivate: (state) => {
+                state.slowActive = true;
+                document.getElementById('badge-slow')?.classList.add('active');
+                if (state.slowTimer) clearTimeout(state.slowTimer);
+                state.slowTimer = setTimeout(() => {
+                    state.slowActive = false;
+                    document.getElementById('badge-slow')?.classList.remove('active');
+                }, state.duration);
+            }
+        });
+
+        // A3: Combo Boost - combo decays 2x slower (window doubles)
+        powerupRegistry.register('comboBoost', {
+            color: 0xff1493,
+            icon: '⚡',
+            duration: 12000,
+            badgeId: 'badge-combo',
+            onActivate: (state) => {
+                state.comboBoostActive = true;
+                document.getElementById('badge-combo')?.classList.add('active');
+                if (state.comboBoostTimer) clearTimeout(state.comboBoostTimer);
+                state.comboBoostTimer = setTimeout(() => {
+                    state.comboBoostActive = false;
+                    document.getElementById('badge-combo')?.classList.remove('active');
+                }, state.duration);
+            }
+        });
+
         // Convenience: activate a registered powerup
         function activatePowerup(type) {
             const cfg = powerupRegistry.get(type);
             if (!cfg) return;
+            playPowerupSound();
             cfg.onActivate({
                 doubleScoreActive, freezeActive, fireShieldActive,
+                magnetActive, slowActive, comboBoostActive,
                 doubleScoreTimer, freezeTimer, shieldTimer,
+                magnetTimer, slowTimer, comboBoostTimer,
                 duration: cfg.duration
             });
         }
 
         // Reset all cooldowns (convenience wrapper)
         function resetAllCooldowns() {
-            [doubleScoreTimer, freezeTimer, shieldTimer].forEach(t => t && clearTimeout(t));
+            [doubleScoreTimer, freezeTimer, shieldTimer, magnetTimer, slowTimer, comboBoostTimer].forEach(t => t && clearTimeout(t));
             doubleScoreActive = false;
             freezeActive = false;
             fireShieldActive = false;
-            ['badge-double','badge-freeze','badge-shield'].forEach(id =>
+            magnetActive = false;
+            slowActive = false;
+            comboBoostActive = false;
+            ['badge-double','badge-freeze','badge-shield','badge-magnet','badge-slow','badge-combo'].forEach(id =>
                 document.getElementById(id)?.classList.remove('active')
             );
         }
@@ -2521,9 +2608,10 @@
             const bar = document.getElementById('combo-bar');
             if (!bar) return;
             // comboMultiplier 1-5, show decay based on remaining time
+            const effectiveTimeout = COMBO_TIMEOUT_MS * (comboBoostActive ? 2 : 1);
             const elapsed = Date.now() - lastHitTime;
-            const remaining = Math.max(0, COMBO_TIMEOUT_MS - elapsed);
-            const pct = (remaining / COMBO_TIMEOUT_MS) * 100;
+            const remaining = Math.max(0, effectiveTimeout - elapsed);
+            const pct = (remaining / effectiveTimeout) * 100;
             bar.style.width = pct + '%';
         }
 
@@ -2583,9 +2671,10 @@
             combo++;
             lastHitTime = Date.now();
             if (comboTimer) clearTimeout(comboTimer);
+            const effectiveTimeout = COMBO_TIMEOUT_MS * (comboBoostActive ? 2 : 1);
             comboTimer = setTimeout(() => {
                 showComboBreak();
-            }, COMBO_TIMEOUT_MS);
+            }, effectiveTimeout);
 
             // Calculate multiplier
             if (combo >= 20) comboMultiplier = 5;
@@ -3081,11 +3170,14 @@
         let lastSpawnTime = 0;
 
         function spawnLoop(time) {
-            if (gameRunning && !gamePaused && !endlessMode && time - lastSpawnTime > spawnInterval) {
-                const available = holes.map((h, i) => i).filter(i => !holes[i].occupied);
-                if (available.length > 0) {
-                    const holeIndex = available[Math.floor(Math.random() * available.length)];
-                    const rand = Math.random();
+            if (gameRunning && !gamePaused && !endlessMode) {
+                const effectiveInterval = slowActive ? spawnInterval * 2 : spawnInterval;
+                if (time - lastSpawnTime > effectiveInterval) {
+                    lastSpawnTime = time;
+                    const available = holes.map((h, i) => i).filter(i => !holes[i].occupied);
+                    if (available.length > 0) {
+                        const holeIndex = available[Math.floor(Math.random() * available.length)];
+                        const rand = Math.random();
                     
                     // Boss battle spawns fire moles as interference
                     if (bossActive) {
@@ -3111,8 +3203,11 @@
                             else if (rand < 0.08) showMole(holeIndex, 'rainbow');
                             else if (rand < 0.28) showMole(holeIndex, 'golden');
                             else if (rand < 0.36) showMole(holeIndex, 'bomb');
-                            else if (rand < 0.44) showPowerup(holeIndex, 'double');
-                            else if (rand < 0.52) showPowerup(holeIndex, 'freeze');
+                            else if (rand < 0.42) showPowerup(holeIndex, 'double');
+                            else if (rand < 0.48) showPowerup(holeIndex, 'freeze');
+                            else if (rand < 0.53) showPowerup(holeIndex, 'magnet');
+                            else if (rand < 0.58) showPowerup(holeIndex, 'slow');
+                            else if (rand < 0.62) showPowerup(holeIndex, 'comboBoost');
                             else showMole(holeIndex, 'normal');
                         }
                     }
@@ -3131,8 +3226,9 @@
             if (combo > 0) {
                 updateComboBar();
                 // Check if combo expired
+                const effectiveTimeout = COMBO_TIMEOUT_MS * (comboBoostActive ? 2 : 1);
                 const elapsed = Date.now() - lastHitTime;
-                if (elapsed >= COMBO_TIMEOUT_MS) {
+                if (elapsed >= effectiveTimeout) {
                     showComboBreak();
                 }
             }
@@ -3144,7 +3240,9 @@
                 const baseDur = cfg?.appearDuration
                     ? cfg.appearDuration / 16   // frames (16ms per tick)
                     : (endlessMode ? endlessMoleDuration : moleDuration);
-                const effectiveDuration = freezeActive ? baseDur * 1.5 : baseDur;
+                let effectiveDuration = baseDur;
+                if (freezeActive) effectiveDuration *= 1.5;
+                if (slowActive) effectiveDuration *= 1.5;
                 if (moleData.timer > effectiveDuration) {
                     moleData.state = 'hiding';
                     hideMole(moleData);
@@ -3157,13 +3255,24 @@
             updateParticles();
             updateBlastRings();
             updateLavaParticles();
-            
+
+            // A3: Magnet effect - pull visible moles toward center
+            if (magnetActive) {
+                moles.forEach(md => {
+                    if (md.hit || md.isPowerup || md.state !== 'visible') return;
+                    md.mesh.position.x *= 0.97;
+                    md.mesh.position.z *= 0.97;
+                });
+                // Rotate magnet field indicator
+                if (magnetFieldGroup) magnetFieldGroup.rotation.y += 0.02;
+            }
+
             // Rotate lava particles
             lavaParticles.forEach(p => {
                 p.mesh.rotation.x += 0.01;
                 p.mesh.rotation.y += 0.02;
             });
-            
+
             renderer.render(scene3, camera);
         }
         animate();
@@ -3237,9 +3346,15 @@
             doubleScoreActive = false;
             freezeActive = false;
             fireShieldActive = false;
+            magnetActive = false;
+            slowActive = false;
+            comboBoostActive = false;
             if (doubleScoreTimer) clearTimeout(doubleScoreTimer);
             if (freezeTimer) clearTimeout(freezeTimer);
             if (shieldTimer) clearTimeout(shieldTimer);
+            if (magnetTimer) clearTimeout(magnetTimer);
+            if (slowTimer) clearTimeout(slowTimer);
+            if (comboBoostTimer) clearTimeout(comboBoostTimer);
             if (comboTimer) clearTimeout(comboTimer);
             
             document.getElementById('score-display').textContent = '0';
@@ -3256,6 +3371,9 @@
             document.getElementById('badge-double').classList.remove('active');
             document.getElementById('badge-freeze').classList.remove('active');
             document.getElementById('badge-shield').classList.remove('active');
+            document.getElementById('badge-magnet').classList.remove('active');
+            document.getElementById('badge-slow').classList.remove('active');
+            document.getElementById('badge-combo').classList.remove('active');
             document.getElementById('boss-hp-container').style.display = 'none';
             document.getElementById('boss-hp-text').style.display = 'none';
             document.getElementById('boss-hit-counter').style.display = 'none';
