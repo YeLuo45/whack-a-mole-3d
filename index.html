@@ -2038,71 +2038,184 @@
             playLevelUpSound();
         }
 
-        // ============ MOLE TYPES (v3) ============
-        const MOLE_TYPES = {
-            normal: { color: 0x8B6914, weight: 0.5 },
-            golden: { color: 0xffd700, emissive: 0xff8c00, weight: 0.2 },
-            bomb: { color: 0x333333, weight: 0.08 },
-            fire: { color: 0xff4500, emissive: 0xff2200, weight: 0.07 },
-            silver: { color: 0xc0c0c0, emissive: 0x808080, weight: 0.075 },
-            rainbow: { color: 0xff00ff, emissive: 0x00ffff, weight: 0.075 }
-        };
-
-        function getRandomMoleType() {
-            const rand = Math.random();
-            let cumulative = 0;
-            for (const [type, cfg] of Object.entries(MOLE_TYPES)) {
-                cumulative += cfg.weight;
-                if (rand < cumulative) return type;
+        // ============ MOLE TYPE REGISTRY (nanobot-design inspired) ============
+        class MoleTypeRegistry {
+            constructor() { this._types = {}; }
+            register(id, config) {
+                // config: { color, emissive?, weight, createExtra?(group, type) }
+                this._types[id] = { id, ...config };
             }
-            return 'normal';
+            unregister(id) { delete this._types[id]; }
+            get(id) { return this._types[id]; }
+            list() { return Object.values(this._types); }
+            getRandom() {
+                const entries = this.list();
+                const totalWeight = entries.reduce((s, t) => s + (t.weight || 0), 0);
+                let rand = Math.random() * totalWeight;
+                for (const t of entries) { rand -= t.weight || 0; if (rand <= 0) return t.id; }
+                return entries[0]?.id || 'normal';
+            }
+        }
+        const moleRegistry = new MoleTypeRegistry();
+
+        // Register built-in mole types
+        moleRegistry.register('normal', {
+            color: 0x8B6914, weight: 0.5,
+            createExtra: null
+        });
+        moleRegistry.register('golden', {
+            color: 0xffd700, emissive: 0xff8c00, emissiveIntensity: 0.2,
+            metalness: 0.5, weight: 0.2,
+            snoutColor: 0xffa500, noseColor: 0xff6600,
+            createExtra: null
+        });
+        moleRegistry.register('bomb', {
+            color: 0x333333, weight: 0.08, hasBomb: true,
+            createExtra: (group) => {
+                // Bomb fuse + spark + eyes
+                const fuseGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8);
+                const fuseMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const fuse = new THREE.Mesh(fuseGeo, fuseMat);
+                fuse.position.set(0, 1.35, 0);
+                group.add(fuse);
+                const sparkGeo = new THREE.SphereGeometry(0.06, 8, 8);
+                const sparkMat = new THREE.MeshBasicMaterial({ color: 0xff4500 });
+                const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                spark.position.set(0, 1.5, 0);
+                spark.name = 'spark';
+                group.add(spark);
+                const eyeGeo = new THREE.SphereGeometry(0.1, 16, 16);
+                const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                leftEye.position.set(-0.15, 1.0, 0.35);
+                leftEye.name = 'leftEye';
+                group.add(leftEye);
+                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                rightEye.position.set(0.15, 1.0, 0.35);
+                rightEye.name = 'rightEye';
+                group.add(rightEye);
+            }
+        });
+        moleRegistry.register('fire', {
+            color: 0xff4500, emissive: 0xff2200, emissiveIntensity: 0.2,
+            roughness: 0.5, weight: 0.07,
+            snoutColor: 0xff6600, noseColor: 0xff0000,
+            createExtra: null
+        });
+        moleRegistry.register('silver', {
+            color: 0xc0c0c0, emissive: 0x808080, emissiveIntensity: 0.3,
+            metalness: 0.8, weight: 0.075,
+            snoutColor: 0xd0d0d0, noseColor: 0xaaaaaa,
+            createExtra: null
+        });
+        moleRegistry.register('rainbow', {
+            color: 0xff00ff, emissive: 0x00ffff, emissiveIntensity: 0.4,
+            metalness: 0.6, weight: 0.075,
+            snoutColor: 0xff88ff, noseColor: 0xff44ff,
+            createExtra: null
+        });
+
+        // Backward compat alias
+        // Backward compat alias
+        const MOLE_TYPES = moleRegistry._types;
+        function getRandomMoleType() { return moleRegistry.getRandom(); }
+
+        // ============ POWERUP REGISTRY (nanobot-design inspired) ============
+        class PowerupRegistry {
+            constructor() { this._types = {}; }
+            register(id, config) {
+                // config: { color, icon, onActivate(state), duration, badgeId }
+                this._types[id] = { id, ...config };
+            }
+            unregister(id) { delete this._types[id]; }
+            get(id) { return this._types[id]; }
+            list() { return Object.values(this._types); }
+        }
+        const powerupRegistry = new PowerupRegistry();
+
+        // Register built-in powerups
+        powerupRegistry.register('double', {
+            color: 0xffd700,
+            icon: '×2',
+            duration: 8000,
+            badgeId: 'badge-double',
+            onActivate: (state) => {
+                state.doubleScoreActive = true;
+                document.getElementById('badge-double')?.classList.add('active');
+                if (state.doubleScoreTimer) clearTimeout(state.doubleScoreTimer);
+                state.doubleScoreTimer = setTimeout(() => {
+                    state.doubleScoreActive = false;
+                    document.getElementById('badge-double')?.classList.remove('active');
+                }, state.duration);
+            }
+        });
+        powerupRegistry.register('freeze', {
+            color: 0x00ffff,
+            icon: '❄',
+            duration: 6000,
+            badgeId: 'badge-freeze',
+            onActivate: (state) => {
+                state.freezeActive = true;
+                document.getElementById('badge-freeze')?.classList.add('active');
+                if (state.freezeTimer) clearTimeout(state.freezeTimer);
+                state.freezeTimer = setTimeout(() => {
+                    state.freezeActive = false;
+                    document.getElementById('badge-freeze')?.classList.remove('active');
+                }, state.duration);
+            }
+        });
+        powerupRegistry.register('fireShield', {
+            color: 0xff4500,
+            icon: '🔥',
+            duration: 15000,
+            badgeId: 'badge-shield',
+            onActivate: (state) => {
+                state.fireShieldActive = true;
+                document.getElementById('badge-shield')?.classList.add('active');
+                if (state.shieldTimer) clearTimeout(state.shieldTimer);
+                state.shieldTimer = setTimeout(() => {
+                    state.fireShieldActive = false;
+                    document.getElementById('badge-shield')?.classList.remove('active');
+                }, state.duration);
+            }
+        });
+
+        // Convenience: activate a registered powerup
+        function activatePowerup(type) {
+            const cfg = powerupRegistry.get(type);
+            if (!cfg) return;
+            cfg.onActivate({
+                doubleScoreActive, freezeActive, fireShieldActive,
+                doubleScoreTimer, freezeTimer, shieldTimer,
+                duration: cfg.duration
+            });
         }
 
-        // ============ MOLE CREATION ============
+        // Reset all cooldowns (convenience wrapper)
+        function resetAllCooldowns() {
+            [doubleScoreTimer, freezeTimer, shieldTimer].forEach(t => t && clearTimeout(t));
+            doubleScoreActive = false;
+            freezeActive = false;
+            fireShieldActive = false;
+            ['badge-double','badge-freeze','badge-shield'].forEach(id =>
+                document.getElementById(id)?.classList.remove('active')
+            );
+        }
+
+        // ============ MOLE CREATION (registry-driven) ============
         function createMole(type = 'normal') {
             const moleGroup = new THREE.Group();
             moleGroup.userData.moleType = type;
             moleGroup.userData.isMole = true;
 
-            let bodyColor;
-            let roughness = 0.7;
-            let metalness = 0;
-            let emissive = 0x000000;
-            let emissiveIntensity = 0;
+            const cfg = moleRegistry.get(type) || moleRegistry.get('normal');
 
-            if (type === 'golden') {
-                bodyColor = 0xffd700;
-                metalness = 0.5;
-                emissive = 0xff8c00;
-                emissiveIntensity = 0.2;
-            } else if (type === 'bomb') {
-                bodyColor = 0x333333;
-            } else if (type === 'fire') {
-                bodyColor = 0xff4500;
-                roughness = 0.5;
-                emissive = 0xff2200;
-                emissiveIntensity = 0.2;
-            } else if (type === 'silver') {
-                bodyColor = 0xc0c0c0;
-                metalness = 0.8;
-                emissive = 0x808080;
-                emissiveIntensity = 0.3;
-            } else if (type === 'rainbow') {
-                // Rainbow: cycle through hue
-                bodyColor = 0xff00ff;
-                emissive = 0x00ffff;
-                emissiveIntensity = 0.4;
-                metalness = 0.6;
-            } else {
-                bodyColor = 0x8B6914;
-            }
-
-            const bodyMat = new THREE.MeshStandardMaterial({ 
-                color: bodyColor, 
-                roughness, 
-                metalness,
-                emissive,
-                emissiveIntensity
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: cfg.color,
+                roughness: cfg.roughness ?? 0.7,
+                metalness: cfg.metalness ?? 0,
+                emissive: cfg.emissive ?? 0x000000,
+                emissiveIntensity: cfg.emissiveIntensity ?? 0
             });
             const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
             const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -2119,32 +2232,12 @@
             head.name = 'head';
             moleGroup.add(head);
 
-            if (type === 'bomb') {
-                const fuseGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8);
-                const fuseMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-                const fuse = new THREE.Mesh(fuseGeo, fuseMat);
-                fuse.position.set(0, 1.35, 0);
-                moleGroup.add(fuse);
-
-                const sparkGeo = new THREE.SphereGeometry(0.06, 8, 8);
-                const sparkMat = new THREE.MeshBasicMaterial({ color: 0xff4500 });
-                const spark = new THREE.Mesh(sparkGeo, sparkMat);
-                spark.position.set(0, 1.5, 0);
-                spark.name = 'spark';
-                moleGroup.add(spark);
-
-                const eyeGeo = new THREE.SphereGeometry(0.1, 16, 16);
-                const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-                leftEye.position.set(-0.15, 1.0, 0.35);
-                leftEye.name = 'leftEye';
-                moleGroup.add(leftEye);
-                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-                rightEye.position.set(0.15, 1.0, 0.35);
-                rightEye.name = 'rightEye';
-                moleGroup.add(rightEye);
-            } else {
-                const snoutColor = type === 'golden' ? 0xffa500 : type === 'fire' ? 0xff6600 : type === 'silver' ? 0xd0d0d0 : type === 'rainbow' ? 0xff88ff : 0x6B4E0A;
+            if (cfg.hasBomb) {
+                // Bomb: fuse + spark + round eyes (via createExtra)
+                cfg.createExtra?.(moleGroup, 'bomb');
+            } else if (cfg.hasFace !== false) {
+                // Normal mole face: snout + nose + eyes + cheeks
+                const snoutColor = cfg.snoutColor ?? 0x6B4E0A;
                 const snoutGeo = new THREE.SphereGeometry(0.15, 16, 16);
                 const snoutMat = new THREE.MeshStandardMaterial({ color: snoutColor, roughness: 0.8 });
                 const snout = new THREE.Mesh(snoutGeo, snoutMat);
@@ -2153,7 +2246,7 @@
                 snout.name = 'snout';
                 moleGroup.add(snout);
 
-                const noseColor = type === 'golden' ? 0xff6600 : type === 'fire' ? 0xff0000 : type === 'silver' ? 0xaaaaaa : type === 'rainbow' ? 0xff44ff : 0xff6699;
+                const noseColor = cfg.noseColor ?? 0xff6699;
                 const noseGeo = new THREE.SphereGeometry(0.06, 16, 16);
                 const noseMat = new THREE.MeshStandardMaterial({ color: noseColor, roughness: 0.5 });
                 const nose = new THREE.Mesh(noseGeo, noseMat);
@@ -2183,43 +2276,20 @@
                 rightHighlight.name = 'rightHighlight';
                 moleGroup.add(rightHighlight);
 
-                const earGeo = new THREE.SphereGeometry(0.12, 16, 16);
-                const leftEar = new THREE.Mesh(earGeo, bodyMat);
-                leftEar.position.set(-0.35, 1.2, 0);
-                leftEar.castShadow = true;
-                leftEar.name = 'leftEar';
-                moleGroup.add(leftEar);
-                const rightEar = new THREE.Mesh(earGeo, bodyMat);
-                rightEar.position.set(0.35, 1.2, 0);
-                rightEar.castShadow = true;
-                rightEar.name = 'rightEar';
-                moleGroup.add(rightEar);
-
-                const cheekColor = type === 'golden' ? 0xffffaa : type === 'fire' ? 0xffaaaa : type === 'silver' ? 0xeeeeee : type === 'rainbow' ? 0xffccff : 0xffaaaa;
-                const cheekGeo = new THREE.SphereGeometry(0.1, 16, 16);
-                const cheekMat = new THREE.MeshStandardMaterial({ color: cheekColor, transparent: true, opacity: 0.5 });
+                const cheekGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                const cheekMat = new THREE.MeshStandardMaterial({ color: 0xff9999, transparent: true, opacity: 0.6 });
                 const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
-                leftCheek.position.set(-0.28, 0.9, 0.3);
-                leftCheek.scale.set(1, 0.6, 0.3);
+                leftCheek.position.set(-0.3, 0.85, 0.3);
                 leftCheek.name = 'leftCheek';
                 moleGroup.add(leftCheek);
                 const rightCheek = new THREE.Mesh(cheekGeo, cheekMat);
-                rightCheek.position.set(0.28, 0.9, 0.3);
-                rightCheek.scale.set(1, 0.6, 0.3);
+                rightCheek.position.set(0.3, 0.85, 0.3);
                 rightCheek.name = 'rightCheek';
                 moleGroup.add(rightCheek);
-
-                const toothGeo = new THREE.BoxGeometry(0.08, 0.1, 0.05);
-                const toothMat = new THREE.MeshStandardMaterial({ color: 0xfffff0 });
-                const leftTooth = new THREE.Mesh(toothGeo, toothMat);
-                leftTooth.position.set(-0.06, 0.72, 0.4);
-                leftTooth.name = 'leftTooth';
-                moleGroup.add(leftTooth);
-                const rightTooth = new THREE.Mesh(toothGeo, toothMat);
-                rightTooth.position.set(0.06, 0.72, 0.4);
-                rightTooth.name = 'rightTooth';
-                moleGroup.add(rightTooth);
             }
+
+            // Invoke generic extra parts hook (e.g. ears, accessories)
+            cfg.createExtra?.(moleGroup, type);
 
             return moleGroup;
         }
@@ -2498,32 +2568,14 @@
         }
 
         function activatePowerup(type) {
+            const cfg = powerupRegistry.get(type);
+            if (!cfg) return;
             playPowerupSound();
-            if (type === 'double') {
-                doubleScoreActive = true;
-                document.getElementById('badge-double').classList.add('active');
-                if (doubleScoreTimer) clearTimeout(doubleScoreTimer);
-                doubleScoreTimer = setTimeout(() => {
-                    doubleScoreActive = false;
-                    document.getElementById('badge-double').classList.remove('active');
-                }, 8000);
-            } else if (type === 'freeze') {
-                freezeActive = true;
-                document.getElementById('badge-freeze').classList.add('active');
-                if (freezeTimer) clearTimeout(freezeTimer);
-                freezeTimer = setTimeout(() => {
-                    freezeActive = false;
-                    document.getElementById('badge-freeze').classList.remove('active');
-                }, 5000);
-            } else if (type === 'fireShield') {
-                fireShieldActive = true;
-                document.getElementById('badge-shield').classList.add('active');
-                if (shieldTimer) clearTimeout(shieldTimer);
-                shieldTimer = setTimeout(() => {
-                    fireShieldActive = false;
-                    document.getElementById('badge-shield').classList.remove('active');
-                }, 15000);
-            }
+            cfg.onActivate({
+                doubleScoreActive, freezeActive, fireShieldActive,
+                doubleScoreTimer, freezeTimer, shieldTimer,
+                duration: cfg.duration
+            });
         }
 
         // ============ WHACK ============
@@ -2702,18 +2754,6 @@
             }
         }
 
-        function resetAllCooldowns() {
-            if (doubleScoreTimer) { clearTimeout(doubleScoreTimer); doubleScoreTimer = null; }
-            if (freezeTimer) { clearTimeout(freezeTimer); freezeTimer = null; }
-            if (shieldTimer) { clearTimeout(shieldTimer); shieldTimer = null; }
-            doubleScoreActive = false;
-            freezeActive = false;
-            fireShieldActive = false;
-            document.getElementById('badge-double')?.classList.remove('active');
-            document.getElementById('badge-freeze')?.classList.remove('active');
-            document.getElementById('badge-shield')?.classList.remove('active');
-        }
-
         function activateAllPowerups() {
             activatePowerup('double');
             activatePowerup('freeze');
@@ -2722,10 +2762,8 @@
         }
 
         function getPowerupText(type) {
-            if (type === 'double') return '双倍得分！';
-            if (type === 'freeze') return '冻结！';
-            if (type === 'fireShield') return '护盾！';
-            return '';
+            const labels = { double: '双倍得分！', freeze: '冻结！', fireShield: '护盾！' };
+            return labels[type] ?? powerupRegistry.get(type)?.icon ?? '';
         }
 
         function showHitEffect(x, y, color = '#c44') {
