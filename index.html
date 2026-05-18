@@ -709,7 +709,7 @@
 
     <div id="achievement-screen">
         <h2>🏆 成就</h2>
-        <div id="achievement-progress">已解锁: <span id="achievement-unlocked-count">0</span>/8</div>
+        <div id="achievement-progress">已解锁: <span id="achievement-unlocked-count">0</span>/22</div>
         <div id="achievement-list"></div>
         <button class="btn" id="back-from-achievements">返回</button>
     </div>
@@ -1104,36 +1104,107 @@
             setTimeout(() => { popup.classList.remove('show'); popup.classList.add('hide'); }, 800);
         }
 
-        // ============ SAVE DATA ============
+        // ============ SAVE DATA (thunderbolt offline-first pattern) ============
+        // SaveDataManager wraps localStorage with automatic migration support
+        class SaveDataManager {
+            static CURRENT_VERSION = 3;
+            
+            static getDefaultData() {
+                return {
+                    version: SaveDataManager.CURRENT_VERSION,
+                    levels: [[0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0]],
+                    bossHP: 100,
+                    bossMaxHP: 100,
+                    highScore: 0,
+                    achievements: {},
+                    coins: 0,
+                    totalHits: 0,
+                    maxCombo: 0,
+                    maxScore: 0,
+                    perfectRounds: 0,
+                    endlessHighScores: [],
+                    moleSkins: 0,
+                    hammerSkins: 0,
+                    loginStreak: 0,
+                    // Achievement tracking stats
+                    comboHits: 0,
+                    speedHits: 0,
+                    goldenHits: 0,
+                    noMissLevel: false,
+                    firstHit: false,
+                    // A5 new tracking stats
+                    skillUses: 0,
+                    invisibleHits: 0,
+                    explosiveDefuses: 0,
+                    rainbowHits: 0,
+                    fireHits: 0,
+                    silverHits: 0,
+                    bossDamageDealt: 0,
+                    powerupsCollected: 0,
+                    perfectAccuracyRounds: 0,
+                    totalPlayTime: 0,
+                    gamesPlayed: 0,
+                    highestEndlessWave: 0,
+                    totalCoinsEarned: 0,
+                    skills: {
+                        goldenFrenzyUses: 0,
+                        timeFreezeUses: 0,
+                        bombRushUses: 0
+                    }
+                };
+            }
+            
+            static migrate(data) {
+                if (!data) return SaveDataManager.getDefaultData();
+                const version = data.version || 1;
+                
+                // Migrate v1 → v2 (original structure)
+                if (version < 2) {
+                    data.achievements = data.achievements || {};
+                    data.coins = data.coins || 0;
+                    data.levels = data.levels || [[0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0]];
+                }
+                
+                // Migrate v2 → v3 (A5 new tracking fields)
+                if (version < 3) {
+                    data.skillUses = data.skillUses || 0;
+                    data.invisibleHits = data.invisibleHits || 0;
+                    data.explosiveDefuses = data.explosiveDefuses || 0;
+                    data.rainbowHits = data.rainbowHits || 0;
+                    data.fireHits = data.fireHits || 0;
+                    data.silverHits = data.silverHits || 0;
+                    data.bossDamageDealt = data.bossDamageDealt || 0;
+                    data.powerupsCollected = data.powerupsCollected || 0;
+                    data.perfectAccuracyRounds = data.perfectAccuracyRounds || 0;
+                    data.totalPlayTime = data.totalPlayTime || 0;
+                    data.gamesPlayed = data.gamesPlayed || 0;
+                    data.highestEndlessWave = data.highestEndlessWave || 0;
+                    data.totalCoinsEarned = data.totalCoinsEarned || 0;
+                    data.skills = data.skills || {
+                        goldenFrenzyUses: 0,
+                        timeFreezeUses: 0,
+                        bombRushUses: 0
+                    };
+                }
+                
+                data.version = SaveDataManager.CURRENT_VERSION;
+                return data;
+            }
+        }
+
         function getSaveData() {
-            const data = localStorage.getItem('whackSaveData');
-            if (data) return JSON.parse(data);
-            return {
-                version: 2,
-                levels: [[0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0]],
-                bossHP: 100,
-                bossMaxHP: 100,
-                highScore: 0,
-                achievements: {},
-                coins: 0,
-                totalHits: 0,
-                maxCombo: 0,
-                maxScore: 0,
-                perfectRounds: 0,
-                endlessHighScores: [],
-                moleSkins: 0,
-                hammerSkins: 0,
-                loginStreak: 0,
-                // Achievement tracking stats
-                comboHits: 0,
-                speedHits: 0,
-                goldenHits: 0,
-                noMissLevel: false,
-                firstHit: false
-            };
+            try {
+                const data = localStorage.getItem('whackSaveData');
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    return SaveDataManager.migrate(parsed);
+                }
+            } catch(e) {}
+            return SaveDataManager.getDefaultData();
         }
 
         function saveSaveData(data) {
+            data.version = SaveDataManager.CURRENT_VERSION;
             localStorage.setItem('whackSaveData', JSON.stringify(data));
         }
 
@@ -1163,7 +1234,7 @@
             return data.bossHP <= 0;
         }
 
-        // ============ ACHIEVEMENT SYSTEM ============
+        // ============ ACHIEVEMENT SYSTEM (extended for A5) ============
         const ACHIEVEMENTS = [
             { id: 'first_hit', name: '初次命中', desc: '击中第一个地鼠', icon: '🎯', reward: 0, condition: (s) => s.firstHit },
             { id: 'combo_5', name: '五连击', desc: '连续击中5个地鼠', icon: '🔥', reward: 100, condition: (s) => s.comboHits >= 5 },
@@ -1173,6 +1244,23 @@
             { id: 'speed_demon', name: '速度恶魔', desc: '3秒内连续击中3个地鼠', icon: '⚡', reward: 300, condition: (s) => s.speedHits >= 3 },
             { id: 'golden_rush', name: '金色狂潮', desc: '连续击中5个金色地鼠', icon: '🪙', reward: 250, condition: (s) => s.goldenHits >= 5 },
             { id: 'world_4', name: '征服者', desc: '通关熔岩世界', icon: '👑', reward: 1000, condition: (s) => s.world4Complete },
+            // A5 new achievements
+            { id: 'skill_master', name: '技能大师', desc: '使用技能50次', icon: '🎓', reward: 300, condition: (s) => s.skillUses >= 50 },
+            { id: 'ghost_hunter', name: '幽灵猎人', desc: '击中30个隐形地鼠', icon: '👻', reward: 400, condition: (s) => s.invisibleHits >= 30 },
+            { id: 'bomb_defuser', name: '拆弹专家', desc: '成功躲避20个炸弹地鼠', icon: '🚧', reward: 350, condition: (s) => s.explosiveDefuses >= 20 },
+            { id: 'rainbow_master', name: '彩虹大师', desc: '击中15个彩虹地鼠', icon: '🌈', reward: 500, condition: (s) => s.rainbowHits >= 15 },
+            { id: 'fire_starter', name: '纵火狂', desc: '击中25个火焰地鼠', icon: '🔥', reward: 300, condition: (s) => s.fireHits >= 25 },
+            { id: 'silver_stalker', name: '白银追踪者', desc: '击中25个银色地鼠', icon: '🥈', reward: 250, condition: (s) => s.silverHits >= 25 },
+            { id: 'boss_smasher', name: 'Boss粉碎者', desc: '累计对Boss造成500点伤害', icon: '💥', reward: 600, condition: (s) => s.bossDamageDealt >= 500 },
+            { id: 'powerup_collector', name: '道具收藏家', desc: '拾取50个道具', icon: '📦', reward: 400, condition: (s) => s.powerupsCollected >= 50 },
+            { id: 'perfect_accuracy', name: '完美精准', desc: '10次完美准确率通关(100%命中)', icon: '🎯', reward: 800, condition: (s) => s.perfectAccuracyRounds >= 10 },
+            { id: 'veteran', name: '资深玩家', desc: '累计游戏时间达到30分钟', icon: '⏱', reward: 500, condition: (s) => s.totalPlayTime >= 1800 },
+            { id: 'addict', name: '上瘾玩家', desc: '累计游戏100局', icon: '🎮', reward: 600, condition: (s) => s.gamesPlayed >= 100 },
+            { id: 'endless_wave_10', name: '无尽探索者', desc: '在无尽模式达到第10波', icon: '🌊', reward: 400, condition: (s) => s.highestEndlessWave >= 10 },
+            { id: 'coin_millionaire', name: '金币百万富翁', desc: '累计获得10000金币', icon: '💰', reward: 1000, condition: (s) => s.totalCoinsEarned >= 10000 },
+            { id: 'golden_frenzy_use', name: '金色狂热者', desc: '使用金色狂热技能30次', icon: '💫', reward: 400, condition: (s) => s.skills?.goldenFrenzyUses >= 30 },
+            { id: 'time_freeze_use', name: '时间冻结者', desc: '使用时间冻结技能30次', icon: '❄️', reward: 400, condition: (s) => s.skills?.timeFreezeUses >= 30 },
+            { id: 'bomb_rush_use', name: '炸弹冲刺者', desc: '使用炸弹冲刺技能30次', icon: '💣', reward: 400, condition: (s) => s.skills?.bombRushUses >= 30 },
         ];
 
         // Achievement state helpers
@@ -1199,6 +1287,8 @@
             
             data.achievements[id] = { unlocked: true, unlockedAt: Date.now() };
             data.coins = (data.coins || 0) + achievement.reward;
+            // A5: Track total coins earned from achievements
+            data.totalCoinsEarned = (data.totalCoinsEarned || 0) + achievement.reward;
             saveSaveData(data);
             
             showAchievementNotification(achievement);
@@ -1253,7 +1343,26 @@
                 goldenHits: data.goldenHits || 0,
                 noMissLevel: data.noMissLevel || false,
                 perfectWorld: perfectWorld,
-                world4Complete: world4Complete
+                world4Complete: world4Complete,
+                // A5 new tracking fields
+                skillUses: data.skillUses || 0,
+                invisibleHits: data.invisibleHits || 0,
+                explosiveDefuses: data.explosiveDefuses || 0,
+                rainbowHits: data.rainbowHits || 0,
+                fireHits: data.fireHits || 0,
+                silverHits: data.silverHits || 0,
+                bossDamageDealt: data.bossDamageDealt || 0,
+                powerupsCollected: data.powerupsCollected || 0,
+                perfectAccuracyRounds: data.perfectAccuracyRounds || 0,
+                totalPlayTime: data.totalPlayTime || 0,
+                gamesPlayed: data.gamesPlayed || 0,
+                highestEndlessWave: data.highestEndlessWave || 0,
+                totalCoinsEarned: data.totalCoinsEarned || 0,
+                skills: data.skills || {
+                    goldenFrenzyUses: 0,
+                    timeFreezeUses: 0,
+                    bombRushUses: 0
+                }
             };
         }
 
@@ -1498,6 +1607,13 @@
             
             if (isNew) {
                 saveEndlessScore(finalScore);
+            }
+            
+            // A5: Track endless wave reached
+            const saveData = getSaveData();
+            if (endlessDifficultyLevel > (saveData.highestEndlessWave || 0)) {
+                saveData.highestEndlessWave = endlessDifficultyLevel;
+                saveSaveData(saveData);
             }
             
             // Check achievements after endless game ends
@@ -2007,6 +2123,12 @@
             if (!bossActive) return false;
             
             bossHitCount++;
+            // A5: Track boss damage dealt
+            const bossDamageAmount = 1;
+            const saveData = getSaveData();
+            saveData.bossDamageDealt = (saveData.bossDamageDealt || 0) + bossDamageAmount;
+            saveSaveData(saveData);
+            checkAchievements();
             playBossHitSound();
             updateBossUI();
 
@@ -2872,6 +2994,10 @@
 
             if (moleData.isPowerup) {
                 activatePowerup(moleData.powerupType);
+                // A5: Track powerup collection
+                data.powerupsCollected = (data.powerupsCollected || 0) + 1;
+                saveSaveData(data);
+                checkAchievements();
                 const color = moleData.powerupType === 'double' ? '#ffd700' : moleData.powerupType === 'freeze' ? '#4ecdc4' : '#ff4500';
                 const text = moleData.powerupType === 'double' ? '2倍得分！' : moleData.powerupType === 'freeze' ? '冻结！' : '火焰护盾！';
                 showScorePopup(x, y, text, color);
@@ -2884,8 +3010,11 @@
 
             const type = moleData.moleType;
 
-            // v3 Special moles handling
+            // v3 Special moles handling - A5 tracking
             if (type === 'silver') {
+                data.silverHits = (data.silverHits || 0) + 1;
+                saveSaveData(data);
+                checkAchievements();
                 playWhackSound();
                 playComboSound();
                 onMoleHit(); // Trigger combo system
@@ -2901,6 +3030,9 @@
                 // Silver mole: random powerup activation
                 activateRandomPowerup();
             } else if (type === 'rainbow') {
+                data.rainbowHits = (data.rainbowHits || 0) + 1;
+                saveSaveData(data);
+                checkAchievements();
                 playGoldenSound();
                 playComboSound();
                 onMoleHit();
@@ -2918,8 +3050,11 @@
                 resetAllCooldowns();
                 activateAllPowerups();
             } else if (type === 'bomb') {
-                // Check fire shield first
+                // Check fire shield first - A5 track explosive defuses
                 if (fireShieldActive) {
+                    data.explosiveDefuses = (data.explosiveDefuses || 0) + 1;
+                    saveSaveData(data);
+                    checkAchievements();
                     fireShieldActive = false;
                     document.getElementById('badge-shield').classList.remove('active');
                     showScorePopup(x, y, '护盾抵挡！', '#ff4500');
@@ -2938,6 +3073,9 @@
                 showScorePopup(x, y, pts + '', '#ff4444');
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 25);
             } else if (type === 'golden') {
+                data.goldenHits = (data.goldenHits || 0) + 1;
+                saveSaveData(data);
+                checkAchievements();
                 playGoldenSound();
                 playComboSound();
                 onMoleHit();
@@ -2952,7 +3090,10 @@
                 setMoleHitExpression(moleData.mesh, type);
                 playWhackSound();
             } else if (type === 'fire') {
-                // Fire mole - part of boss battle interference
+                // Fire mole - A5 track fire hits
+                data.fireHits = (data.fireHits || 0) + 1;
+                saveSaveData(data);
+                checkAchievements();
                 playWhackSound();
                 playComboSound();
                 onMoleHit();
@@ -2966,7 +3107,10 @@
                 spawnHitParticles(pos.x, pos.y, pos.z, 0xff4500, 15);
                 setMoleHitExpression(moleData.mesh, type);
             } else if (type === 'invisible') {
-                // A2: Invisible mole - high reward, transparent, doesn't break combo
+                // A2: Invisible mole - A5 track invisible hits
+                data.invisibleHits = (data.invisibleHits || 0) + 1;
+                saveSaveData(data);
+                checkAchievements();
                 playWhackSound();
                 playComboSound();
                 onMoleHit();
@@ -2980,7 +3124,10 @@
                 spawnHitParticles(pos.x, pos.y, pos.z, 0x88ccff, 15);
                 setMoleHitExpression(moleData.mesh, type);
             } else if (type === 'explosive') {
-                // A2: Explosive mole - blast ring on hit, -15 pts
+                // A2: Explosive mole - blast ring on hit, -15 pts, A5 track explosive defuses (shielded)
+                data.explosiveDefuses = (data.explosiveDefuses || 0) + 1;
+                saveSaveData(data);
+                checkAchievements();
                 playBombSound();
                 showComboBreak();
                 let pts = -15;
@@ -3161,14 +3308,32 @@
             // Q/E/R: charged skills
             if (key === 'KeyQ' && skillRegistry.isReady('goldenFrenzy')) {
                 skillRegistry.use('goldenFrenzy');
+                // A5: Track skill usage
+                const sd = getSaveData();
+                sd.skillUses = (sd.skillUses || 0) + 1;
+                sd.skills.goldenFrenzyUses = (sd.skills.goldenFrenzyUses || 0) + 1;
+                saveSaveData(sd);
+                checkAchievements();
                 skillRegistry.setCooldown('goldenFrenzy', skillRegistry.get('goldenFrenzy').cooldown);
                 skillRegistry.get('goldenFrenzy').onActivate({});
             } else if (key === 'KeyE' && skillRegistry.isReady('timeFreeze')) {
                 skillRegistry.use('timeFreeze');
+                // A5: Track skill usage
+                const sd = getSaveData();
+                sd.skillUses = (sd.skillUses || 0) + 1;
+                sd.skills.timeFreezeUses = (sd.skills.timeFreezeUses || 0) + 1;
+                saveSaveData(sd);
+                checkAchievements();
                 skillRegistry.setCooldown('timeFreeze', skillRegistry.get('timeFreeze').cooldown);
                 skillRegistry.get('timeFreeze').onActivate({ freezeActive, freezeTimer });
             } else if (key === 'KeyR' && skillRegistry.isReady('bombRush')) {
                 skillRegistry.use('bombRush');
+                // A5: Track skill usage
+                const sd = getSaveData();
+                sd.skillUses = (sd.skillUses || 0) + 1;
+                sd.skills.bombRushUses = (sd.skills.bombRushUses || 0) + 1;
+                saveSaveData(sd);
+                checkAchievements();
                 skillRegistry.setCooldown('bombRush', skillRegistry.get('bombRush').cooldown);
                 skillRegistry.get('bombRush').onActivate({});
             } else if (key === 'KeyD' && !doubleScoreActive) {
@@ -3218,6 +3383,13 @@
                 if (!gameRunning || gamePaused) return;
                 if (skillRegistry.isReady(id)) {
                     skillRegistry.use(id);
+                    // A5: Track skill usage
+                    const sd = getSaveData();
+                    sd.skillUses = (sd.skillUses || 0) + 1;
+                    const skillKey = id + 'Uses';
+                    sd.skills[skillKey] = (sd.skills[skillKey] || 0) + 1;
+                    saveSaveData(sd);
+                    checkAchievements();
                     skillRegistry.setCooldown(id, skillRegistry.get(id).cooldown);
                     skillRegistry.get(id).onActivate({ freezeActive, freezeTimer });
                 }
@@ -3515,6 +3687,11 @@
         }
 
         function startGame(time) {
+            // A5: Track games played
+            const saveData = getSaveData();
+            saveData.gamesPlayed = (saveData.gamesPlayed || 0) + 1;
+            saveSaveData(saveData);
+            
             score = 0;
             timeLeft = time;
             gameRunning = true;
@@ -3642,6 +3819,12 @@
             // Check for perfect accuracy (100%)
             if (totalClicks > 0 && totalHits === totalClicks && stars > 0) {
                 data.perfectRounds = (data.perfectRounds || 0) + 1;
+                data.perfectAccuracyRounds = (data.perfectAccuracyRounds || 0) + 1;
+            }
+            // A5: Track play time
+            if (gameStartTime) {
+                const playTime = (Date.now() - gameStartTime - totalPausedTime) / 1000;
+                data.totalPlayTime = (data.totalPlayTime || 0) + playTime;
             }
             saveSaveData(data);
 
