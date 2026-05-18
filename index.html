@@ -560,6 +560,115 @@
         #back-from-achievements {
             margin: 20px 0 30px;
         }
+        #shop-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #1a0a2e 0%, #2d1b4e 50%, #1a0a2e 100%);
+            z-index: 200;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        #shop-screen h2 {
+            color: #ffd700;
+            font-size: 42px;
+            margin: 20px 0 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #shop-coins-display {
+            color: #ffd700;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .shop-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .shop-tab {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid #ffd700;
+            border-radius: 8px;
+            color: #ffd700;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .shop-tab.active {
+            background: #ffd700;
+            color: #1a0a2e;
+        }
+        #shop-item-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            max-width: 1200px;
+            width: 100%;
+            padding: 10px;
+        }
+        .shop-item {
+            background: linear-gradient(135deg, rgba(60,50,30,0.9), rgba(40,30,15,0.9));
+            border-radius: 12px;
+            border: 2px solid #5a4a2a;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .shop-item:hover {
+            border-color: #ffd700;
+            transform: translateY(-2px);
+        }
+        .shop-item.owned {
+            border-color: #4CAF50;
+            background: linear-gradient(135deg, rgba(30,60,30,0.9), rgba(20,40,20,0.9));
+        }
+        .shop-item.equipped {
+            border-color: #ffd700;
+            background: linear-gradient(135deg, rgba(100,80,20,0.9), rgba(60,50,10,0.9));
+            box-shadow: 0 0 15px rgba(255,215,0,0.3);
+        }
+        .shop-item-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .shop-item-name {
+            color: #ffd700;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        .shop-item-desc {
+            color: #8b6914;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .shop-item-price {
+            color: #ffd700;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .shop-item-status {
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .shop-item-status.owned {
+            background: #4CAF50;
+            color: white;
+        }
+        .shop-item-status.equipped {
+            background: #ffd700;
+            color: #1a0a2e;
+        }
+        .shop-item-status.locked {
+            background: #666;
+            color: #ccc;
+        }
     </style>
 </head>
 <body>
@@ -613,6 +722,7 @@
         <button class="btn" id="start-btn">开始游戏</button>
         <button class="btn btn-secondary btn-small" id="world-btn">选择关卡</button>
         <button class="btn btn-secondary btn-small" id="achievement-btn">🏆 成就</button>
+        <button class="btn btn-secondary btn-small" id="shop-btn">🛒 商店</button>
         <div style="margin-top: 15px;">
             <button class="btn btn-small" id="sound-toggle-btn" style="background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);">🔊 音效开</button>
         </div>
@@ -712,6 +822,17 @@
         <div id="achievement-progress">已解锁: <span id="achievement-unlocked-count">0</span>/22</div>
         <div id="achievement-list"></div>
         <button class="btn" id="back-from-achievements">返回</button>
+    </div>
+
+    <div id="shop-screen">
+        <h2>🛒 皮肤商店</h2>
+        <div id="shop-coins-display">💰 金币: <span id="shop-coins-val">0</span></div>
+        <div class="shop-tabs">
+            <button class="shop-tab active" data-tab="mole">🐹 地鼠皮肤</button>
+            <button class="shop-tab" data-tab="hammer">🔨 锤子皮肤</button>
+        </div>
+        <div id="shop-item-list"></div>
+        <button class="btn" id="back-from-shop">返回</button>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
@@ -1107,7 +1228,7 @@
         // ============ SAVE DATA (thunderbolt offline-first pattern) ============
         // SaveDataManager wraps localStorage with automatic migration support
         class SaveDataManager {
-            static CURRENT_VERSION = 3;
+            static CURRENT_VERSION = 4;
             
             static getDefaultData() {
                 return {
@@ -1185,6 +1306,13 @@
                         timeFreezeUses: 0,
                         bombRushUses: 0
                     };
+                }
+                
+                // Migrate v3 → v4 (A6 shop system)
+                if (version < 4) {
+                    data.ownedSkins = data.ownedSkins || [];
+                    data.equippedMoleSkin = data.equippedMoleSkin || 'mole_normal';
+                    data.equippedHammerSkin = data.equippedHammerSkin || 'hammer_wood';
                 }
                 
                 data.version = SaveDataManager.CURRENT_VERSION;
@@ -1431,6 +1559,121 @@
         document.getElementById('back-from-achievements')?.addEventListener('click', () => {
             document.getElementById('achievement-screen').style.display = 'none';
             document.getElementById('start-screen').style.display = 'flex';
+        });
+
+        // A6: Shop system
+        let currentShopTab = 'mole';
+        let equippedMoleSkin = 'mole_normal';
+        let equippedHammerSkin = 'hammer_wood';
+
+        function showShopScreen() {
+            const data = getSaveData();
+            document.getElementById('shop-coins-val').textContent = data.coins || 0;
+            equippedMoleSkin = data.equippedMoleSkin || 'mole_normal';
+            equippedHammerSkin = data.equippedHammerSkin || 'hammer_wood';
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('shop-screen').style.display = 'block';
+            renderShopItems();
+        }
+
+        function renderShopItems() {
+            const list = document.getElementById('shop-item-list');
+            const data = getSaveData();
+            const ownedSkins = data.ownedSkins || [];
+            list.innerHTML = '';
+            
+            const items = skinRegistry.listByType(currentShopTab);
+            for (const skin of items) {
+                const owned = ownedSkins.includes(skin.id) || skin.price === 0;
+                const equipped = (currentShopTab === 'mole' && equippedMoleSkin === skin.id) ||
+                                (currentShopTab === 'hammer' && equippedHammerSkin === skin.id);
+                
+                const item = document.createElement('div');
+                item.className = `shop-item ${owned ? 'owned' : ''} ${equipped ? 'equipped' : ''}`;
+                
+                let statusClass = owned ? 'owned' : 'locked';
+                let statusText = owned ? (equipped ? '已装备' : '已拥有') : '🔒';
+                
+                item.innerHTML = `
+                    <div class="shop-item-icon">${skin.icon}</div>
+                    <div class="shop-item-name">${skin.name}</div>
+                    <div class="shop-item-desc">${skin.description}</div>
+                    <div class="shop-item-price">${skin.price === 0 ? '免费' : '💰 ' + skin.price}</div>
+                    <span class="shop-item-status ${statusClass}">${statusText}</span>
+                `;
+                
+                item.addEventListener('click', () => handleShopItemClick(skin.id));
+                list.appendChild(item);
+            }
+        }
+
+        function handleShopItemClick(skinId) {
+            const skin = skinRegistry.get(skinId);
+            if (!skin) return;
+            
+            const data = getSaveData();
+            const ownedSkins = data.ownedSkins || [];
+            const isOwned = ownedSkins.includes(skinId) || skin.price === 0;
+            
+            if (isOwned) {
+                // Equip the skin
+                if (skin.type === 'mole') {
+                    equippedMoleSkin = skinId;
+                    data.equippedMoleSkin = skinId;
+                } else {
+                    equippedHammerSkin = skinId;
+                    data.equippedHammerSkin = skinId;
+                }
+                saveSaveData(data);
+                renderShopItems();
+                showShopNotification('已装备: ' + skin.name);
+            } else {
+                // Try to purchase
+                if ((data.coins || 0) >= skin.price) {
+                    data.coins -= skin.price;
+                    ownedSkins.push(skinId);
+                    data.ownedSkins = ownedSkins;
+                    if (skin.type === 'mole') {
+                        equippedMoleSkin = skinId;
+                        data.equippedMoleSkin = skinId;
+                    } else {
+                        equippedHammerSkin = skinId;
+                        data.equippedHammerSkin = skinId;
+                    }
+                    saveSaveData(data);
+                    document.getElementById('shop-coins-val').textContent = data.coins;
+                    renderShopItems();
+                    showShopNotification('购买成功: ' + skin.name);
+                    checkAchievements();
+                } else {
+                    showShopNotification('金币不足！需要 ' + skin.price + ' 金币');
+                }
+            }
+        }
+
+        function showShopNotification(text) {
+            const notif = document.getElementById('achievement-notification');
+            document.getElementById('achievement-notif-name').textContent = '🛒 商店';
+            document.getElementById('achievement-notif-reward').textContent = '';
+            document.getElementById('achievement-notif-progress').textContent = text;
+            notif.classList.add('show');
+            setTimeout(() => { notif.classList.remove('show'); }, 2000);
+        }
+
+        document.getElementById('shop-btn')?.addEventListener('click', showShopScreen);
+        document.getElementById('back-from-shop')?.addEventListener('click', () => {
+            document.getElementById('shop-screen').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+        });
+
+        // Shop tab switching
+        document.querySelectorAll('.shop-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentShopTab = tab.dataset.tab;
+                renderShopItems();
+            });
         });
 
         // ============ GAME STATE ============
@@ -2208,6 +2451,72 @@
             playLevelUpSound();
         }
 
+        // ============ SKIN REGISTRY (A6 shop system) ============
+        class SkinRegistry {
+            constructor() { this._skins = {}; }
+            register(id, config) {
+                // config: { name, type ('mole'|'hammer'), price, color, emissive?, emissiveIntensity?, description, icon }
+                this._skins[id] = { id, ...config };
+            }
+            get(id) { return this._skins[id]; }
+            list() { return Object.values(this._skins); }
+            listByType(type) { return this.list().filter(s => s.type === type); }
+        }
+        const skinRegistry = new SkinRegistry();
+
+        // Mole skins
+        skinRegistry.register('mole_normal', {
+            name: '森林地鼠', type: 'mole', price: 0, color: 0x8B6914,
+            description: '默认森林地鼠', icon: '🐹'
+        });
+        skinRegistry.register('mole_galaxy', {
+            name: '银河地鼠', type: 'mole', price: 500, color: 0x4a0080, emissive: 0x2200aa, emissiveIntensity: 0.3,
+            description: '神秘银河色彩', icon: '🌌'
+        });
+        skinRegistry.register('mole_ice', {
+            name: '冰霜地鼠', type: 'mole', price: 300, color: 0x88ccff, emissive: 0x4488ff, emissiveIntensity: 0.2,
+            description: '冰冷北境来客', icon: '❄️'
+        });
+        skinRegistry.register('mole_lava', {
+            name: '熔岩地鼠', type: 'mole', price: 400, color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 0.3,
+            description: '火山岩浆铸就', icon: '🌋'
+        });
+        skinRegistry.register('mole_toxic', {
+            name: '毒液地鼠', type: 'mole', price: 350, color: 0x44ff44, emissive: 0x00aa00, emissiveIntensity: 0.2,
+            description: '剧毒生物武器', icon: '☠️'
+        });
+        skinRegistry.register('mole_crystal', {
+            name: '水晶地鼠', type: 'mole', price: 600, color: 0xaaeeff, emissive: 0xffffff, emissiveIntensity: 0.4,
+            metalness: 0.8, transparent: true, opacity: 0.85,
+            description: '透明水晶之躯', icon: '💎'
+        });
+        skinRegistry.register('mole_skull', {
+            name: '骷髅地鼠', type: 'mole', price: 800, color: 0xeeeeee, emissive: 0xff6666, emissiveIntensity: 0.2,
+            description: '亡灵骷髅战士', icon: '💀'
+        });
+
+        // Hammer skins
+        skinRegistry.register('hammer_wood', {
+            name: '木锤', type: 'hammer', price: 0, color: 0x8B4513,
+            description: '默认木质锤子', icon: '🪵'
+        });
+        skinRegistry.register('hammer_golden', {
+            name: '金锤', type: 'hammer', price: 500, color: 0xffd700, emissive: 0xff8c00, emissiveIntensity: 0.3,
+            description: '黄金铸就神锤', icon: '🔨'
+        });
+        skinRegistry.register('hammer_crystal', {
+            name: '水晶锤', type: 'hammer', price: 400, color: 0x88ccff, emissive: 0x4488ff, emissiveIntensity: 0.3,
+            description: '晶莹剔透之锤', icon: '💎'
+        });
+        skinRegistry.register('hammer_skull', {
+            name: '骷髅锤', type: 'hammer', price: 600, color: 0xcccccc, emissive: 0x66ff66, emissiveIntensity: 0.2,
+            description: '亡灵战锤', icon: '💀'
+        });
+        skinRegistry.register('hammer_lava', {
+            name: '熔岩锤', type: 'hammer', price: 550, color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 0.4,
+            description: '熔岩烈焰之锤', icon: '🌋'
+        });
+
         // ============ MOLE TYPE REGISTRY (nanobot-design inspired) ============
         class MoleTypeRegistry {
             constructor() { this._types = {}; }
@@ -2587,7 +2896,7 @@
             );
         }
 
-        // ============ MOLE CREATION (registry-driven) ============
+        // ============ MOLE CREATION (registry-driven, A6 skin-aware) ============
         function createMole(type = 'normal') {
             const moleGroup = new THREE.Group();
             moleGroup.userData.moleType = type;
@@ -2604,6 +2913,20 @@
                 transparent: cfg.transparent ?? false,
                 opacity: cfg.opacity ?? 1.0
             });
+            
+            // A6: Apply equipped mole skin color to body/head
+            const skin = skinRegistry.get(equippedMoleSkin);
+            if (skin) {
+                bodyMat.color.setHex(skin.color);
+                if (skin.emissive) bodyMat.emissive.setHex(skin.emissive);
+                bodyMat.emissiveIntensity = skin.emissiveIntensity ?? 0;
+                if (skin.metalness !== undefined) bodyMat.metalness = skin.metalness;
+                if (skin.transparent) {
+                    bodyMat.transparent = true;
+                    bodyMat.opacity = skin.opacity ?? 0.85;
+                }
+            }
+            
             const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.scale.set(1, 0.8, 1);
@@ -2613,7 +2936,7 @@
             moleGroup.add(body);
 
             const headGeo = new THREE.SphereGeometry(0.45, 32, 32);
-            const head = new THREE.Mesh(headGeo, bodyMat);
+            const head = new THREE.Mesh(headGeo, bodyMat); // uses same material reference
             head.position.y = 0.9;
             head.castShadow = true;
             head.name = 'head';
