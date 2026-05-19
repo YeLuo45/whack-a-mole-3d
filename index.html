@@ -1071,6 +1071,79 @@
         }
 
         const perfMonitor = new PerformanceMonitor();
+
+        // ============ A12 TUTORIAL SYSTEM ============
+        class TutorialSystem {
+            constructor() {
+                this.steps = [
+                    { target: '#start-btn', text: '点击「开始游戏」按钮进入游戏', position: 'center' },
+                    { target: '#mode-endless', text: '选择「无尽模式」挑战高分', position: 'center' },
+                    { target: '#crosshair', text: '移动鼠标瞄准地鼠，点击左键敲击', position: 'center' },
+                    { target: '#combo-bar-container', text: '连续敲击可累积连击倍数', position: 'center' },
+                    { target: '#skill-goldenFrenzy', text: 'Q 键释放技能：召唤5只金地鼠', position: 'center' },
+                    { target: '#pause-btn', text: '按 P 键或点击暂停按钮暂停游戏', position: 'center' }
+                ];
+                this.currentStep = -1;
+                this.overlay = null;
+            }
+
+            isCompleted() {
+                try {
+                    const data = JSON.parse(localStorage.getItem('whackSaveData') || '{}');
+                    return data.tutorialCompleted;
+                } catch { return false; }
+            }
+
+            complete() {
+                try {
+                    const data = JSON.parse(localStorage.getItem('whackSaveData') || '{}');
+                    data.tutorialCompleted = true;
+                    localStorage.setItem('whackSaveData', JSON.stringify(data));
+                } catch {}
+                this.hide();
+            }
+
+            hide() {
+                const o = document.getElementById('tutorial-overlay');
+                if (o) o.remove();
+                const h = document.getElementById('tutorial-highlight');
+                if (h) h.remove();
+            }
+
+            showStep(idx) {
+                this.currentStep = idx;
+                if (idx < 0 || idx >= this.steps.length) { this.hide(); return; }
+                const step = this.steps[idx];
+                let o = document.getElementById('tutorial-overlay');
+                if (!o) {
+                    o = document.createElement('div');
+                    o.id = 'tutorial-overlay';
+                    o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9998;display:flex;align-items:center;justify-content:center;';
+                    document.body.appendChild(o);
+                }
+                o.innerHTML = `
+                    <div style="background:#1a1a2e;border-radius:12px;padding:24px 32px;max-width:360px;text-align:center;color:#eee;box-shadow:0 4px 24px rgba(0,0,0,0.5);">
+                        <div style="font-size:48px;margin-bottom:12px;">🎯</div>
+                        <div id="tutorial-text" style="font-size:16px;line-height:1.5;margin-bottom:20px;">${step.text}</div>
+                        <div style="display:flex;gap:10px;justify-content:center;align-items:center;">
+                            <button id="tutorial-skip" style="background:#444;border:none;color:#aaa;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;">跳过</button>
+                            <button id="tutorial-next" style="background:#4CAF50;border:none;color:#fff;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;">${idx < this.steps.length - 1 ? '下一步 →' : '完成 ✓'}</button>
+                        </div>
+                        <div id="tutorial-progress" style="margin-top:12px;font-size:12px;color:#888;">${idx + 1} / ${this.steps.length}</div>
+                    </div>
+                `;
+                o.style.display = 'flex';
+                document.getElementById('tutorial-next')?.addEventListener('click', () => this.showStep(idx + 1));
+                document.getElementById('tutorial-skip')?.addEventListener('click', () => this.complete());
+            }
+
+            start() {
+                if (this.isCompleted()) return;
+                this.showStep(0);
+            }
+        }
+
+        const tutorialSystem = new TutorialSystem();
         let audioCtx = null;
         let soundEnabled = true;
         
@@ -4632,6 +4705,9 @@
 
         // Initialize high score display
         document.getElementById('high-score-val').textContent = getSaveData().highScore;
+
+        // A12: Start tutorial for first-time players
+        tutorialSystem.start();
         
         // Load and initialize sound setting
         loadSoundSetting();
