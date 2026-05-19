@@ -1027,7 +1027,50 @@
             };
         }
 
-        // ============ AUDIO SYSTEM ============
+        // ============ A11 PERFORMANCE MONITOR ============
+        class PerformanceMonitor {
+            constructor() {
+                this.enabled = false;
+                this.fps = 60;
+                this.frameCount = 0;
+                this.lastFPSTime = performance.now();
+                this.particleCount = 0;
+                this.moleCount = 0;
+                this.callDepth = 0;
+            }
+
+            toggle() {
+                this.enabled = !this.enabled;
+                const panel = document.getElementById('perf-panel');
+                if (panel) panel.style.display = this.enabled ? 'block' : 'none';
+            }
+
+            update(particleCount = 0, moleCount = 0) {
+                this.frameCount++;
+                const now = performance.now();
+                if (now - this.lastFPSTime >= 1000) {
+                    this.fps = Math.round(this.frameCount * 1000 / (now - this.lastFPSTime));
+                    this.frameCount = 0;
+                    this.lastFPSTime = now;
+                }
+                this.particleCount = particleCount;
+                this.moleCount = moleCount;
+                this.render();
+            }
+
+            render() {
+                let panel = document.getElementById('perf-panel');
+                if (!panel) {
+                    panel = document.createElement('div');
+                    panel.id = 'perf-panel';
+                    panel.style.cssText = 'position:fixed;top:60px;right:10px;background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:12px;padding:8px;border-radius:4px;display:none;z-index:9999;';
+                    document.body.appendChild(panel);
+                }
+                panel.innerHTML = `FPS:${this.fps} | 粒子:${this.particleCount} | 地鼠:${this.moleCount}`;
+            }
+        }
+
+        const perfMonitor = new PerformanceMonitor();
         let audioCtx = null;
         let soundEnabled = true;
         
@@ -3942,6 +3985,11 @@
 
         // ============ KEYBOARD SKILLS (D/F/S) & NEW ABILITIES (Q/E/R) ============
         window.addEventListener('keydown', (e) => {
+            // A11: Performance monitor toggle (P key)
+            if (e.code === 'KeyP' && !gameRunning) {
+                perfMonitor.toggle();
+                return;
+            }
             if (!gameRunning || gamePaused) return;
             const key = e.code;
             // Q/E/R: charged skills
@@ -4261,6 +4309,9 @@
                     md.mesh.userData.animator.update();
                 }
             });
+
+            // A11: Update performance monitor
+            perfMonitor.update(particles.length, moles.length);
 
             // A3: Magnet effect - pull visible moles toward center
             if (magnetActive) {
